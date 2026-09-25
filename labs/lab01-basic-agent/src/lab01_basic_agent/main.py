@@ -13,21 +13,44 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 def main() -> None:
     print(f"Connecting to Ollama at: {OLLAMA_HOST}")
     print(f"Using model: {OLLAMA_MODEL}")
+    print("\nType 'exit' to quit.\n")
 
     client = Client(host=OLLAMA_HOST)
 
-    response = client.chat(
-        model=OLLAMA_MODEL,
-        messages=[
+    messages = []
+
+    while True:
+        user_input = input("You: ").strip()
+
+        if user_input.lower() == "exit":
+            print("Goodbye!")
+            break
+
+        if not user_input:
+            continue
+
+        messages.append(
             {
                 "role": "user",
-                "content": "Explain what an AI agent is in one paragraph.",
+                "content": user_input,
             }
-        ],
-    )
+        )
 
-    print("\nModel response:\n")
-    print(response.message.content)
+        response = client.chat(
+            model=OLLAMA_MODEL,
+            messages=messages,
+        )
+
+        assistant_message = response.message.content
+
+        messages.append(
+            {
+                "role": "assistant",
+                "content": assistant_message,
+            }
+        )
+
+        print(f"\nAgent: {assistant_message}\n")
 
 
 if __name__ == "__main__":
