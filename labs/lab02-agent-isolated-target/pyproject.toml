@@ -1,0 +1,19 @@
+[project]
+name = "lab02-agent-isolated-target"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Angel Elbaz", email = "22364064+aelbazsanz@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "ollama>=0.6.2",
+]
+
+[project.scripts]
+lab02-agent-isolated-target = "lab02_agent_isolated_target:main"
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"

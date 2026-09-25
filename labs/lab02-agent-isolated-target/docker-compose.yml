@@ -1,0 +1,25 @@
+services:
+  agent:
+    image: ai-agents-lab02-agent:latest
+    container_name: ai-agents-lab02-agent
+    networks:
+      - llm-network
+      - target-network
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: qwen3:8b
+      TARGET_HOST: target
+
+  target:
+    image: ai-agents-lab02-target:latest
+    container_name: ai-agents-lab02-target
+    networks:
+      - target-network
+
+networks:
+  llm-network:
+    external: true
+    name: ai-agents-llm
+
+  target-network:
+    internal: true
