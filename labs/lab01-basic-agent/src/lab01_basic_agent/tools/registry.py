@@ -3,6 +3,7 @@
 from lab01_basic_agent.tools.basic import days_until_date
 from lab01_basic_agent.tools.basic import get_current_date
 from lab01_basic_agent.tools.basic import get_current_time
+from lab01_basic_agent.tools.permissions import is_tool_allowed
 
 # tools registry
 TOOLS = {
@@ -11,12 +12,17 @@ TOOLS = {
     "get_current_time": get_current_time,
 }
 
-
+# Tool execution function
 def execute_tool(name: str, arguments: dict) -> str:
+    """Validate, authorize, and execute a tool."""
+
     tool = TOOLS.get(name)
 
     if tool is None:
         raise ValueError(f"Unknown tool: {name}")
+
+    if not is_tool_allowed(name):
+        raise PermissionError(f"Tool not allowed: {name}")
 
     result = tool(**arguments)
 

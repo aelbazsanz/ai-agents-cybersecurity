@@ -1,4 +1,3 @@
-# imports
 import os
 import time
 
@@ -7,13 +6,13 @@ from ollama import Client
 
 from lab01_basic_agent.tools.registry import TOOLS, execute_tool
 
-# read environment variables from .env file
+
 load_dotenv()
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 
-# Class definition for the Agent
+
 class Agent:
     def __init__(self, max_iterations: int = 5) -> None:
         self.client = Client(host=OLLAMA_HOST)
@@ -22,15 +21,12 @@ class Agent:
     def run(self, user_input: str) -> str:
         run_start = time.perf_counter()
 
-        # time tracking variables
         total_llm_time = 0.0
         total_tool_time = 0.0
         tool_call_count = 0
 
-        # event tracking
         events = []
 
-        # messages list to maintain the conversation context
         messages = [
             {
                 "role": "user",
@@ -86,27 +82,65 @@ class Agent:
                 print(f"[Agent] Tool requested: {tool_name}")
                 print(f"[Agent] Arguments: {arguments}")
 
-                tool_start = time.perf_counter()
-
-                tool_result = execute_tool(tool_name, arguments)
-
-                tool_duration = time.perf_counter() - tool_start
-
-                total_tool_time += tool_duration
                 tool_call_count += 1
 
-                events.append(
-                    {
-                        "type": "tool_call",
-                        "iteration": iteration,
-                        "tool": tool_name,
-                        "arguments": arguments,
-                        "result": tool_result,
-                        "duration": tool_duration,
-                    }
-                )
+                tool_start = time.perf_counter()
 
-                print(f"[Agent] Tool result: {tool_result}")
+                try:
+                    tool_result = execute_tool(tool_name, arguments)
+
+                except PermissionError as error:
+                    tool_result = (
+                        f"Tool execution denied by security policy: {error}"
+                    )
+
+                    events.append(
+                        {
+                            "type": "tool_denied",
+                            "iteration": iteration,
+                            "tool": tool_name,
+                            "arguments": arguments,
+                            "error": str(error),
+                        }
+                    )
+
+                    print(f"[Agent] Tool denied: {tool_name}")
+                    print(f"[Agent] Reason: {error}")
+
+                except Exception as error:
+                    tool_result = (
+                        f"Tool execution failed: {type(error).__name__}: {error}"
+                    )
+
+                    events.append(
+                        {
+                            "type": "tool_error",
+                            "iteration": iteration,
+                            "tool": tool_name,
+                            "arguments": arguments,
+                            "error": str(error),
+                        }
+                    )
+
+                    print(f"[Agent] Tool error: {tool_name}")
+                    print(f"[Agent] Error: {error}")
+
+                else:
+                    events.append(
+                        {
+                            "type": "tool_call",
+                            "iteration": iteration,
+                            "tool": tool_name,
+                            "arguments": arguments,
+                            "result": tool_result,
+                        }
+                    )
+
+                    print(f"[Agent] Tool result: {tool_result}")
+
+                tool_duration = time.perf_counter() - tool_start
+                total_tool_time += tool_duration
+
                 print(f"[Agent] Tool duration: {tool_duration:.6f}s")
 
                 messages.append(
