@@ -7,7 +7,7 @@ from ollama import Client
 
 from lab01_basic_agent.tools.registry import TOOLS, execute_tool
 
-# load environment variables from .env file
+# read environment variables from .env file
 load_dotenv()
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -22,11 +22,15 @@ class Agent:
     def run(self, user_input: str) -> str:
         run_start = time.perf_counter()
 
-        # Variables for time measurement
+        # time tracking variables
         total_llm_time = 0.0
         total_tool_time = 0.0
         tool_call_count = 0
 
+        # event tracking
+        events = []
+
+        # messages list to maintain the conversation context
         messages = [
             {
                 "role": "user",
@@ -47,6 +51,14 @@ class Agent:
 
             iteration_duration = time.perf_counter() - iteration_start
             total_llm_time += iteration_duration
+
+            events.append(
+                {
+                    "type": "llm_call",
+                    "iteration": iteration,
+                    "duration": iteration_duration,
+                }
+            )
 
             print(
                 f"[Agent] LLM response received in "
@@ -82,6 +94,17 @@ class Agent:
 
                 total_tool_time += tool_duration
                 tool_call_count += 1
+
+                events.append(
+                    {
+                        "type": "tool_call",
+                        "iteration": iteration,
+                        "tool": tool_name,
+                        "arguments": arguments,
+                        "result": tool_result,
+                        "duration": tool_duration,
+                    }
+                )
 
                 print(f"[Agent] Tool result: {tool_result}")
                 print(f"[Agent] Tool duration: {tool_duration:.6f}s")
