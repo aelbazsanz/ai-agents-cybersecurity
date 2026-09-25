@@ -1,106 +1,113 @@
-# Lab 01 — Basic AI Agent
+# Lab 01 — Basic Agent
 
 ## Objective
 
-Build a minimal AI agent from scratch using a local open-source LLM served through Ollama.
+Build a minimal AI agent from scratch using a locally hosted Large Language Model (LLM), without relying on agent frameworks such as LangChain or LangGraph.
 
-The goal of this lab is to understand the fundamental components of an AI agent before introducing higher-level frameworks such as LangChain or LangGraph.
+The purpose of this lab is to understand the fundamental building blocks of an AI agent before introducing more advanced agent architectures, external tools, and cybersecurity attack scenarios.
 
-The implementation is intentionally simple and explicit so that the agent's decision-making process, tool execution, and control flow remain visible.
+The agent is intentionally implemented in a simple and explicit way so that its behavior can be inspected and modified easily.
 
 ---
 
 ## Learning Goals
 
-By completing this lab, you will understand:
+By completing this lab, we learn how to:
 
-* How to interact with a local LLM.
-* How to maintain conversational context.
-* How LLMs can request tool execution.
-* How an application exposes tools to an LLM.
-* How to implement a tool registry and dispatcher.
-* How to build a basic agent loop.
-* How an agent can execute multiple tools.
-* The difference between multiple tool calls and sequential multi-step tasks.
-* The difference between an LLM, a conversational application, and an AI agent.
-* Why the application, rather than the LLM, must control tool execution.
-* Why tool execution represents an important security boundary.
+* interact with a local LLM
+* maintain conversation history
+* expose tools to an LLM
+* implement a tool registry
+* dispatch tool calls
+* implement an agent decision loop
+* execute multiple tools
+* execute dependent sequential tool calls
+* collect basic execution observability
+* understand the boundary between an LLM and an agent
+* introduce tool permissions and capabilities
+* establish basic authorization boundaries around tools
 
-These concepts will be used in later labs focused on cybersecurity and agent security.
+The lab intentionally avoids agent frameworks so that the underlying mechanisms remain visible.
 
 ---
 
 ## Architecture
 
-The lab evolves incrementally.
-
-### Initial architecture
+The current architecture is intentionally simple:
 
 ```text
-User
- ↓
-Application
- ↓
-LLM
- ↓
-Response
+                    ┌─────────────────────┐
+                    │       User          │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │       Agent         │
+                    │                     │
+                    │   Agent Loop        │
+                    └──────────┬──────────┘
+                               │
+                    ┌──────────▼──────────┐
+                    │        Ollama       │
+                    │        + LLM        │
+                    └──────────┬──────────┘
+                               │
+                         Tool Call
+                               │
+                    ┌──────────▼──────────┐
+                    │    Tool Registry    │
+                    └──────────┬──────────┘
+                               │
+                    ┌──────────▼──────────┐
+                    │       Tool          │
+                    └──────────┬──────────┘
+                               │
+                         Tool Result
+                               │
+                               ▼
+                              LLM
 ```
 
-This is an LLM-powered application, but it is not yet a complete agent.
+The agent explicitly controls the interaction between the LLM and the available tools.
 
-### Tool calling
+---
 
-The next step introduces tools:
+## Project Architecture
+
+Lab 01 runs directly on the host machine.
+
+This is intentional.
+
+The project will later introduce containerized agents and vulnerable targets, but the first laboratory keeps the execution environment simple to make debugging and learning easier.
+
+The broader project architecture is expected to evolve towards something similar to:
 
 ```text
-User
- ↓
-Application
- ↓
-LLM
- ↓
-Tool call
- ↓
-Tool
- ↓
-Tool result
- ↓
-LLM
- ↓
-Final response
+                         Host
+                          │
+             ┌────────────┴────────────┐
+             │                         │
+             ▼                         ▼
+       Shared Ollama              Docker Network
+       Infrastructure                  │
+                              ┌────────┴─────────┐
+                              │                  │
+                              ▼                  ▼
+                         Agent Container   Vulnerable Target
 ```
 
-### Current architecture
+Lab 01 does **not** implement this containerized architecture yet.
 
-The lab now implements a basic agent loop:
+Future laboratories may introduce:
 
-```text
-                    ┌───────────────┐
-                    │      LLM      │
-                    └───────┬───────┘
-                            │
-                       Tool call?
-                       /       \
-                     No         Yes
-                     │           │
-                     │      ┌────▼─────┐
-                     │      │ Dispatcher│
-                     │      └────┬─────┘
-                     │           │
-                     │         Tool
-                     │           │
-                     │      Tool result
-                     │           │
-                     │      ┌────▼─────┐
-                     │      │    LLM    │
-                     │      └────┬─────┘
-                     │           │
-                     └───────────┘
-```
+* containerized AI agents
+* isolated vulnerable applications
+* vulnerable services
+* dedicated attacker/defender environments
+* Docker networks separating components
+* controlled communication between agents and targets
 
-The loop continues until the LLM produces a final response or the maximum number of iterations is reached.
-
-The agent can also process multiple tool calls returned by the LLM in the same response.
+This separation will become particularly important when studying agent security and attack scenarios.
 
 ---
 
@@ -108,154 +115,428 @@ The agent can also process multiple tool calls returned by the LLM in the same r
 
 The lab currently implements:
 
-* Local LLM interaction through Ollama.
-* Interactive conversation with message history.
-* Tool definitions using Python functions.
-* Tool calling through the Ollama API.
-* A generic tool registry.
-* A tool dispatcher.
-* A basic agent loop.
-* Multiple tool execution.
-* A maximum iteration limit to prevent unbounded execution.
-* Configuration through environment variables.
+1. Direct LLM interaction
+2. Interactive conversation
+3. Tool calling
+4. Tool registry and dispatcher
+5. Agent decision loop
+6. Multiple tool calls
+7. Sequential dependent tool calls
+8. Basic observability
 
-The current tools are intentionally harmless:
+The next stage is to introduce:
 
-```text
-get_current_date()
-get_current_time()
-```
-
-Both operate using UTC.
+9. Tool permissions and capabilities
+10. Input validation
+11. Trust boundaries
+12. Security-oriented tool usage
 
 ---
 
-## Important Concept: LLM vs Agent
+## LLM vs Agent
 
-An LLM by itself generates responses based on the input it receives.
+An important concept in this lab is the difference between an LLM and an agent.
 
-A conversational application adds state and sends previous messages back to the model.
+A simple LLM interaction looks like:
 
-A tool-enabled application allows the model to request actions.
+```text
+User
+ │
+ ▼
+LLM
+ │
+ ▼
+Response
+```
 
-An agent introduces a control loop in which the model can repeatedly:
+The LLM generates text, but it does not independently execute actions.
 
-1. Observe the current state.
-2. Decide whether it needs a tool.
-3. Request a tool.
-4. Receive the tool result.
-5. Continue reasoning.
-6. Produce a final response.
+The agent introduces an execution loop:
 
-This distinction is important for cybersecurity.
+```text
+User
+ │
+ ▼
+Agent
+ │
+ ▼
+LLM
+ │
+ ├── Final answer ───────────────► Agent
+ │
+ └── Tool call
+        │
+        ▼
+      Tool
+        │
+        ▼
+    Tool result
+        │
+        ▼
+       LLM
+        │
+        ▼
+   Final answer
+```
 
-An LLM does not inherently execute operating-system commands, access files, scan networks, or make HTTP requests.
+The agent therefore acts as the control layer between the LLM and external capabilities.
 
-Those capabilities are provided by the surrounding application.
+This distinction becomes especially important from a cybersecurity perspective because the security boundary is not only the model itself.
 
-Therefore, the application is responsible for deciding:
-
-* Which tools exist.
-* Which tools can be executed.
-* Which arguments are accepted.
-* Whether a tool call is authorized.
-* How tool results are returned to the model.
-* How many actions the agent can perform.
-
-This boundary becomes increasingly important in later cybersecurity labs.
+The agent controls what the model is allowed to do.
 
 ---
 
 ## Tool Registry and Dispatcher
 
-The tool registry is implemented in:
+Tools are registered explicitly in:
 
 ```text
 src/lab01_basic_agent/tools/registry.py
 ```
 
-It maps tool names to Python functions:
+The registry currently exposes:
 
-```python
-TOOLS = {
-    "get_current_date": get_current_date,
-    "get_current_time": get_current_time,
-}
-```
+* `get_current_time`
+* `get_current_date`
+* `days_until_date`
 
-The dispatcher receives the name and arguments requested by the LLM:
-
-```python
-execute_tool(name, arguments)
-```
-
-and resolves the request against the registry.
-
-Conceptually:
+The dispatcher receives the requested tool name and its arguments:
 
 ```text
 LLM
  │
  │ tool name + arguments
  ▼
-Registry
+Tool Registry
  │
- │ resolve tool
- ▼
-Python function
- │
- │ result
  ▼
 Dispatcher
  │
  ▼
-LLM
+Tool
 ```
 
-This creates an explicit boundary between the model's request and actual tool execution.
+This explicit registry will later provide a natural place to introduce authorization and capability controls.
 
 ---
 
 ## Agent Loop
 
-The agent implementation is located in:
+The agent repeatedly performs the following steps:
 
 ```text
-src/lab01_basic_agent/agent.py
+1. Send conversation to LLM
+2. Inspect LLM response
+3. Check whether a tool call was requested
+4. Execute the requested tool
+5. Add the tool result to the conversation
+6. Ask the LLM again
+7. Stop when the LLM produces a final response
 ```
 
-The core loop is intentionally implemented without an agent framework.
-
-At a high level:
-
-```python
-while iterations < max_iterations:
-
-    response = llm(...)
-
-    if no_tool_call:
-        return final_response
-
-    execute_requested_tools()
-
-    add_tool_results_to_conversation()
-```
-
-A maximum iteration count is used to prevent an agent from entering an uncontrolled loop.
-
-The current default is:
+Conceptually:
 
 ```text
-5 iterations
+        ┌───────────────┐
+        │     Agent     │
+        └───────┬───────┘
+                │
+                ▼
+             ┌─────┐
+             │ LLM │
+             └──┬──┘
+                │
+         ┌──────┴──────┐
+         │             │
+    Tool call       Final answer
+         │
+         ▼
+       Tool
+         │
+         ▼
+    Tool result
+         │
+         └──────────► LLM
 ```
 
-This is a basic safety mechanism rather than a complete authorization system.
+---
+
+## Multiple Tool Calls
+
+The agent can execute more than one tool during a single task.
+
+For example:
+
+```text
+LLM
+ │
+ ├── get_current_date
+ │
+ ├── get_current_time
+ │
+ └── days_until_date
+```
+
+The agent processes the requested tools and returns their results to the LLM.
+
+This demonstrates that an agent can coordinate multiple capabilities rather than simply generating a single response.
+
+---
+
+## Sequential Multi-Step Tasks
+
+A more important experiment is a task where one tool depends on the output of another.
+
+Example:
+
+```text
+User
+ │
+ ▼
+LLM
+ │
+ ▼
+get_current_date()
+ │
+ ▼
+2026-09-25
+ │
+ ▼
+LLM
+ │
+ ▼
+days_until_date(
+    current_date="2026-09-25",
+    target_date="2026-10-01"
+)
+ │
+ ▼
+6
+ │
+ ▼
+LLM
+ │
+ ▼
+Final answer
+```
+
+This demonstrates genuine agentic behavior because the result of the first tool call becomes an input to the next decision.
+
+---
+
+## Observability
+
+The agent implements basic execution observability.
+
+For each execution it records:
+
+* iteration number
+* LLM execution time
+* tool execution time
+* number of tool calls
+* total execution time
+
+Example:
+
+```text
+[Agent] Iteration 1
+[Agent] LLM response received in 50.319s
+[Agent] Tool requested: get_current_date
+[Agent] Tool result: 2026-09-25
+[Agent] Tool duration: 0.000022s
+
+[Agent] Iteration 2
+[Agent] LLM response received in 73.486s
+[Agent] Tool requested: days_until_date
+[Agent] Tool result: 6
+[Agent] Tool duration: 0.002071s
+
+[Agent] Run summary
+[Agent] Iterations: 3
+[Agent] Tool calls: 2
+[Agent] LLM time: 147.784s
+[Agent] Tool time: 0.002093s
+[Agent] Total time: 147.787s
+```
+
+The purpose is not to build a complete observability platform at this stage.
+
+The objective is to understand what happened during an agent execution.
+
+More advanced tracing, structured logging, metrics, OpenTelemetry, and dashboards can be introduced in later laboratories when they become useful for security analysis.
+
+---
+
+## Tool Permissions and Capabilities
+
+The next stage of the lab introduces a security boundary between the LLM and tool execution.
+
+Currently the conceptual flow is:
+
+```text
+LLM
+ │
+ │ tool call
+ ▼
+execute_tool()
+```
+
+The next architecture will introduce authorization:
+
+```text
+LLM
+ │
+ │ tool call
+ ▼
+┌──────────────────────┐
+│   Tool Permission    │
+│       Policy         │
+└──────────┬───────────┘
+           │
+      ┌────┴─────┐
+      ▼          ▼
+    ALLOW       DENY
+      │
+      ▼
+ execute_tool()
+```
+
+This introduces several important security concepts:
+
+* capabilities
+* least privilege
+* authorization
+* allowlists
+* denied operations
+* trust boundaries
+
+The key question is:
+
+> What is the agent actually authorized to do, independently of what the LLM asks it to do?
+
+This distinction will become increasingly important as the project introduces more powerful tools.
+
+---
+
+## Security Relevance
+
+Although this lab is not yet an offensive security laboratory, it establishes the architecture that future security experiments will target.
+
+An AI agent can be viewed as:
+
+```text
+LLM
+ │
+ ▼
+Decision
+ │
+ ▼
+Tool
+ │
+ ▼
+External effect
+```
+
+Every transition represents a potential security boundary.
+
+Future laboratories will investigate scenarios such as:
+
+```text
+Prompt Injection
+       │
+       ▼
+      LLM
+       │
+       ▼
+     Agent
+       │
+       ▼
+  Tool Authorization
+       │
+       ▼
+      Tool
+       │
+       ▼
+External System
+```
+
+Possible future attack surfaces include:
+
+* prompt injection
+* tool misuse
+* malicious tool descriptions
+* excessive permissions
+* tool poisoning
+* malicious MCP servers
+* malicious Skills
+* filesystem access
+* command execution
+* network access
+* vulnerable applications
+* compromised external services
+
+---
+
+## Infrastructure
+
+Ollama is provided as shared infrastructure for the project.
+
+It is located outside the individual laboratories:
+
+```text
+infrastructure/
+├── docker-compose.yml
+├── .env
+└── .env.example
+```
+
+The current model is:
+
+```text
+Ollama
+└── qwen3:8b
+```
+
+Individual laboratories do not run their own Ollama instance.
+
+This allows future labs to share the same LLM infrastructure while keeping their own agent implementations and security targets isolated.
+
+---
+
+## Environment
+
+Lab 01 currently runs directly on the host.
+
+Expected environment:
+
+```text
+Host
+├── Python
+├── uv
+├── Lab 01 agent
+└── Shared Ollama
+```
+
+Future labs may use:
+
+```text
+Host
+│
+├── Shared Ollama
+│
+└── Docker
+    ├── Agent
+    ├── Vulnerable target
+    ├── Supporting services
+    └── Security tooling
+```
+
+Containerization will therefore be introduced when it provides a concrete security or isolation benefit rather than being added prematurely.
 
 ---
 
 ## Configuration
-
-The lab uses environment variables for configuration.
 
 Create a `.env` file:
 
@@ -264,13 +545,7 @@ OLLAMA_HOST=http://localhost:11434
 OLLAMA_MODEL=qwen3:8b
 ```
 
-The `.env` file is intentionally excluded from Git.
-
-A template is provided as:
-
-```text
-.env.example
-```
+The corresponding `.env.example` should be kept in the repository without secrets.
 
 ---
 
@@ -278,68 +553,37 @@ A template is provided as:
 
 * Python 3.13+
 * `uv`
-* Docker
-* Docker Compose
-* Ollama infrastructure running locally
-* An Ollama-compatible model
-
-The shared Ollama instance is provided by the project's infrastructure layer.
+* Docker (for the shared infrastructure)
+* Ollama infrastructure running
+* `qwen3:8b` model available
 
 ---
 
 ## Installation
 
-From the lab directory:
+From the laboratory directory:
 
 ```bash
 uv sync
 ```
 
-If the dependencies have not been initialized yet:
-
-```bash
-uv init
-uv add ollama python-dotenv
-```
+Make sure the shared Ollama infrastructure is running.
 
 ---
 
 ## Running the Lab
 
-### Interactive application
-
-Run:
+Run the basic agent:
 
 ```bash
 uv run python src/lab01_basic_agent/main.py
 ```
 
-The application maintains conversation history with the LLM.
-
-### Agent test
-
-The current agent loop can be tested with:
+Run the agent tests:
 
 ```bash
 uv run python src/lab01_basic_agent/agent_test.py
 ```
-
-A typical multi-tool execution looks like:
-
-```text
-[Agent] Tool requested: get_current_date
-[Agent] Arguments: {}
-[Agent] Tool result: 2026-09-25
-
-[Agent] Tool requested: get_current_time
-[Agent] Arguments: {}
-[Agent] Tool result: 2026-09-25T08:32:22.226836+00:00
-
-Final answer:
-Today's UTC date is 2026-09-25, and the current UTC time is ...
-```
-
-The exact wording of the final response depends on the LLM.
 
 ---
 
@@ -347,7 +591,10 @@ The exact wording of the final response depends on the LLM.
 
 ```text
 lab01-basic-agent/
+├── .env
+├── .env.example
 ├── pyproject.toml
+├── .python-version
 ├── README.md
 ├── src/
 │   └── lab01_basic_agent/
@@ -362,339 +609,129 @@ lab01-basic-agent/
 └── uv.lock
 ```
 
-### Main components
-
-**`main.py`**
-
-Interactive LLM application.
-
-**`agent.py`**
-
-Basic agent implementation containing the agent loop.
-
-**`agent_test.py`**
-
-Small executable test for the agent loop.
-
-**`tools/basic.py`**
-
-Contains the implementations of the available tools.
-
-**`tools/registry.py`**
-
-Contains the tool registry and dispatcher.
-
-**`pyproject.toml`**
-
-Python project configuration and dependencies.
-
-**`uv.lock`**
-
-Locked dependency versions for reproducible environments.
-
 ---
 
-## Experiments
+## Experiments Completed
 
 ### Experiment 1 — Direct LLM Interaction
 
-The first version of the lab connected directly to Ollama and sent user messages to the model.
+Basic communication with the local LLM.
 
-This demonstrated basic LLM interaction.
-
----
+```text
+User → LLM → Response
+```
 
 ### Experiment 2 — Interactive Conversation
 
-Conversation history was introduced by maintaining a list of messages:
+Maintaining message history across multiple user interactions.
 
 ```text
 User
-Assistant
-User
-Assistant
-...
+ ↓
+LLM
+ ↓
+Conversation history
+ ↓
+LLM
 ```
-
-This demonstrated how applications provide conversational context to an LLM.
-
----
 
 ### Experiment 3 — Tool Calling
 
-A `get_current_time()` tool was exposed to the model.
-
-The model could generate a structured tool call:
+Allowing the LLM to request execution of predefined tools.
 
 ```text
-get_current_time({})
+LLM → Tool → Result → LLM
 ```
 
-The application then executed the function and returned its result to the model.
+### Experiment 4 — Tool Registry
 
-This demonstrated the distinction between:
+Separating tool definitions from tool dispatch.
 
-```text
-LLM requests an action
-```
+### Experiment 5 — Agent Decision Loop
 
-and:
-
-```text
-Application executes an action
-```
-
----
-
-### Experiment 4 — Tool Registry and Dispatcher
-
-The tool was moved behind a generic registry:
-
-```text
-Tool name
-    ↓
-Registry
-    ↓
-Python function
-```
-
-The dispatcher allows the application to resolve and execute tools dynamically.
-
-This removes tool-specific logic from the agent loop.
-
----
-
-### Experiment 5 — Agent Loop
-
-The final step introduced a reusable agent loop.
-
-The agent can:
-
-1. Send the conversation to the LLM.
-2. Inspect the response for tool calls.
-3. Resolve requested tools through the registry.
-4. Execute the tools.
-5. Add tool results to the conversation.
-6. Send the updated conversation back to the LLM.
-7. Repeat until a final response is produced.
-
-This is the first point in the lab where the application behaves as a basic AI agent rather than simply being an LLM wrapper.
-
----
+Allowing the LLM to decide whether it needs a tool or can provide a final answer.
 
 ### Experiment 6 — Multiple Tool Calls
 
-A second tool, `get_current_date()`, was introduced alongside `get_current_time()`.
+Executing multiple tools as part of a single task.
 
-The test asks:
+### Experiment 7 — Sequential Multi-Step Tasks
 
-```text
-Tell me today's UTC date and current UTC time.
-```
+Using the result of one tool as input to a subsequent tool.
 
-The LLM returned two tool calls in the same response:
+### Experiment 8 — Basic Observability
 
-```text
-get_current_date()
-get_current_time()
-```
+Measuring:
 
-The agent loop processed both calls:
-
-```text
-LLM
- ├── get_current_date()
- │       ↓
- │   2026-09-25
- │
- └── get_current_time()
-         ↓
-     2026-09-25T08:32:22...
-         ↓
-        LLM
-         ↓
-    Final response
-```
-
-This demonstrates that the agent is not limited to a single tool call per LLM response.
-
-The implementation handles this through:
-
-```python
-for tool_call in response.message.tool_calls:
-```
-
-Each requested tool is resolved through the registry and executed by the dispatcher.
-
----
-
-## Multiple Tool Calls vs Sequential Multi-step Tasks
-
-These two concepts are related but not identical.
-
-### Multiple tool calls
-
-In the current experiment, the LLM requested both tools in the same response:
-
-```text
-LLM
- ├── Tool A
- └── Tool B
- ↓
-LLM
- ↓
-Final response
-```
-
-The tools are independent and their results do not determine which tool is requested next.
-
-### Sequential multi-step task
-
-A more advanced agent interaction would look like:
-
-```text
-LLM
- ↓
-Tool A
- ↓
-Tool A result
- ↓
-LLM
- ↓
-Tool B
- ↓
-Tool B result
- ↓
-LLM
- ↓
-Final response
-```
-
-In this scenario, the result of the first tool becomes part of the agent's state and can influence the next decision made by the LLM.
-
-This will be the next stage of the multi-step task experiment.
-
----
-
-## Security Relevance
-
-The architecture introduced in this lab establishes several security boundaries that will become important in later experiments.
-
-### Tool execution
-
-The LLM can request a tool, but the application executes it.
-
-This distinction is fundamental.
-
-A malicious or manipulated model output should not automatically translate into arbitrary system actions.
-
----
-
-### Tool authorization
-
-The current implementation does not yet provide fine-grained authorization.
-
-Future implementations can introduce:
-
-* Tool allowlists.
-* Argument validation.
-* User approval.
-* Permission levels.
-* Sandboxing.
-* Execution timeouts.
-* Resource limits.
-* Audit logs.
-
----
-
-### Excessive agency
-
-Giving an agent access to powerful tools increases the potential impact of an incorrect or manipulated decision.
-
-Examples of future tools could include:
-
-```text
-read_file
-execute_command
-send_http_request
-scan_network
-query_database
-```
-
-These capabilities will be introduced only in isolated environments as the project progresses.
-
----
-
-### Prompt Injection
-
-A later lab will investigate how untrusted input can influence an agent into requesting unintended actions.
-
-The relevant attack chain is:
-
-```text
-Untrusted input
-      ↓
-Prompt injection
-      ↓
-LLM decision
-      ↓
-Tool call
-      ↓
-Application action
-```
-
-Understanding this chain is one of the main reasons this lab avoids hiding the agent logic behind a framework.
-
----
-
-### Tool Security
-
-Future labs will also investigate threats such as:
-
-* Malicious tools.
-* Compromised tools.
-* Tool description manipulation.
-* Unsafe tool arguments.
-* Tool result manipulation.
-* Excessive permissions.
-* MCP-related attacks.
-* Skill-related attacks.
+* iterations
+* tool calls
+* LLM execution time
+* tool execution time
+* total execution time
 
 ---
 
 ## Roadmap
 
-The current progression is:
-
 ```text
-1. Direct LLM interaction        — completed
-2. Interactive conversation      — completed
-3. Tool calling                  — completed
-4. Tool registry/dispatcher      — completed
-5. Agent decision loop           — completed
-6. Multiple tool calls           — completed
-7. Sequential multi-step tasks   — next
-8. Observability                 — planned
-9. Cybersecurity-oriented tools  — planned
-10. Security testing of agent    — planned
+1.  Direct LLM interaction        — completed
+2.  Interactive conversation      — completed
+3.  Tool calling                  — completed
+4.  Tool registry/dispatcher      — completed
+5.  Agent decision loop           — completed
+6.  Multiple tool calls           — completed
+7.  Sequential multi-step tasks   — completed
+8.  Basic observability           — completed
+9.  Tool permissions/capabilities — next
+10. Input validation              — planned
+11. Trust boundaries              — planned
+12. Security experiments          — planned
+13. Cybersecurity-oriented tools  — planned
 ```
 
-The next step will introduce a task where the result of one tool call becomes relevant to the agent's next decision.
+---
+
+## Future Laboratory Architecture
+
+Lab 01 is intentionally simple.
+
+Future laboratories will progressively introduce more realistic environments:
+
+```text
+                        AI Agents Cybersecurity
+                                  │
+             ┌────────────────────┼────────────────────┐
+             │                    │                    │
+             ▼                    ▼                    ▼
+        Agent Labs          Vulnerable Targets    Infrastructure
+             │                    │                    │
+             ▼                    ▼                    ▼
+       Docker Agents       Vulnerable Apps       Shared Ollama
+             │
+             ▼
+       Security Tools
+```
+
+The objective is to eventually build isolated environments where an agent can interact with intentionally vulnerable systems.
+
+These environments will allow the project to study both:
+
+* **Red Team:** how AI agents can be manipulated or abused
+* **Blue Team:** how agent behavior can be monitored, constrained, and defended
 
 ---
 
 ## Key Takeaways
 
-At the end of the current stage:
+The main lessons from Lab 01 are:
 
-* An LLM generates text and can request structured tool calls.
-* The surrounding application controls actual tool execution.
-* A tool registry provides a controlled interface between the LLM and application capabilities.
-* A dispatcher resolves tool requests to concrete functions.
-* An agent loop allows repeated model/tool interactions.
-* An agent can process multiple tool calls returned in the same LLM response.
-* Multiple tool calls are not necessarily the same as a sequential multi-step task.
-* Maximum iteration limits provide a basic control against unbounded execution.
-* Tool access creates a security boundary that must be explicitly designed.
-
-The next experiment will investigate true sequential multi-step behavior, where the result of one tool execution becomes relevant to the next agent decision.
+1. An LLM is not automatically an agent.
+2. An agent adds a control loop around an LLM.
+3. Tools give an agent the ability to interact with external systems.
+4. Tool registries define the capabilities available to the agent.
+5. Tool results can become inputs to subsequent agent decisions.
+6. Observability helps understand what happened during an execution.
+7. The agent, not only the LLM, is part of the security boundary.
+8. Tool permissions and capabilities are therefore fundamental security concepts.
+9. Containerization will be introduced in later labs when isolation and realistic attack environments become necessary.
+10. The ultimate goal is to understand how agentic systems can be built, attacked, monitored, and secured.
