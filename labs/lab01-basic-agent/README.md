@@ -16,6 +16,8 @@ This lab introduces:
 * Configuration through environment variables
 * Multi-turn conversations
 * Conversation history
+* Tool calling
+* Tool execution and dispatch
 * The difference between an LLM, a conversational application, and an AI agent
 
 The lab deliberately avoids agent frameworks at this stage.
@@ -24,7 +26,9 @@ The lab deliberately avoids agent frameworks at this stage.
 
 ## Architecture
 
-The current implementation is intentionally simple:
+The laboratory evolves incrementally.
+
+### Initial architecture
 
 ```text
 User
@@ -43,73 +47,76 @@ Qwen 3 8B
   │
   ▼
 Response
-  │
-  └──────────────► Conversation history
 ```
 
-The conversation history is maintained by the Python application and sent to Ollama with each request.
+### Current architecture
+
+After introducing tool calling:
+
+```text
+                         ┌─────────────────┐
+                         │      Qwen       │
+                         │                 │
+User ──────────────────►│  Decide whether │
+                         │  to use a tool  │
+                         └────────┬────────┘
+                                  │
+                             tool_call
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │     Python      │
+                         │    dispatcher   │
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │ get_current_    │
+                         │ time()          │
+                         └────────┬────────┘
+                                  │
+                             tool result
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │      Qwen       │
+                         │                 │
+                         │ final response  │
+                         └─────────────────┘
+```
 
 ---
 
 ## Current State
 
-The lab currently supports interactive multi-turn conversations.
+The laboratory currently supports:
 
-Example:
+* Interactive multi-turn conversations
+* Conversation history
+* LLM tool calling
+* Tool dispatch
+* Tool execution
+* Returning tool results to the LLM
+* Final responses generated using tool results
 
-```text
-You: What is an AI agent?
-
-Agent: ...
-
-You: How is it different from a normal LLM?
-
-Agent: ...
-
-You: What did I ask you in my first question?
-
-Agent: Your first question was "What is an AI agent?"
-```
-
-The application keeps both user and assistant messages in an in-memory list:
+The first tool implemented is:
 
 ```python
-messages = []
+def get_current_time() -> str:
+    """Return the current UTC time."""
 ```
 
-User messages are added to the conversation:
-
-```python
-messages.append(
-    {
-        "role": "user",
-        "content": user_input,
-    }
-)
-```
-
-Assistant responses are also added:
-
-```python
-messages.append(
-    {
-        "role": "assistant",
-        "content": assistant_message,
-    }
-)
-```
-
-The complete conversation is then sent to the model on each request.
+The model can request this tool when appropriate.
 
 ---
 
-## Important Concept: This Is Not Yet an Agent
+## Important Concept: LLM vs Agent
 
-Although the application currently displays the name `Agent`, it is important to distinguish the concepts.
+It is important to distinguish the different layers being built in this laboratory.
 
 ### LLM
 
-An LLM receives a context and generates a response:
+An LLM receives context and generates a response:
 
 ```text
 Prompt
@@ -123,7 +130,7 @@ Response
 
 ### Conversational application
 
-Our current application adds conversation state:
+The application adds conversation state:
 
 ```text
 User
@@ -140,9 +147,40 @@ LLM
 Response
 ```
 
+### Tool-enabled application
+
+The application can expose external capabilities to the model:
+
+```text
+User
+  │
+  ▼
+Application
+  │
+  ▼
+LLM
+  │
+  ├── Tool call
+  │
+  ▼
+Application
+  │
+  ▼
+Tool
+  │
+  ▼
+Tool result
+  │
+  ▼
+LLM
+  │
+  ▼
+Response
+```
+
 ### AI Agent
 
-A real agent will introduce decision-making and actions:
+The next stage will turn this mechanism into a reusable agent loop capable of repeatedly deciding whether an action is required:
 
 ```text
 User
@@ -170,8 +208,6 @@ Decision
       Final answer
 ```
 
-The next stages of this laboratory will progressively implement these capabilities.
-
 ---
 
 ## Configuration
@@ -185,7 +221,7 @@ OLLAMA_HOST=http://localhost:11434
 OLLAMA_MODEL=qwen3:8b
 ```
 
-The model is intentionally configurable rather than hardcoded into the application.
+The model and Ollama host are intentionally configurable rather than hardcoded into the application.
 
 A template is provided in:
 
@@ -255,7 +291,7 @@ Then return to the lab:
 cd ../labs/lab01-basic-agent
 ```
 
-Run the application:
+Run the interactive application:
 
 ```bash
 uv run python src/lab01_basic_agent/main.py
@@ -285,5 +321,190 @@ lab01-basic-agent/
 ├── README.md
 ├── pyproject.toml
 ├── uv.lock
-└──
+└── src/
+    └── lab01_basic_agent/
+        ├── __init__.py
+        ├── main.py
+        ├── tool_call_test.py
+        └── tools/
+            ├── __init__.py
+            └── basic.py
 ```
+
+The local `.env` and `.venv/` directories are intentionally excluded from Git.
+
+---
+
+## Experiments
+
+### Experiment 1 — Direct LLM Interaction
+
+The first version of the application sent a hardcoded prompt to the model.
+
+```text
+Python
+  │
+  ▼
+Ollama
+  │
+  ▼
+LLM
+  │
+  ▼
+Response
+```
+
+This established basic connectivity between Python and the local LLM.
+
+---
+
+### Experiment 2 — Interactive Conversation
+
+The second version introduced an interactive input loop.
+
+```text
+You: What is an AI agent?
+
+Agent: ...
+
+You: How is it different from a normal LLM?
+
+Agent: ...
+
+You: What did I ask you in my first question?
+
+Agent: ...
+```
+
+Conversation history is maintained by the application:
+
+```python
+messages = []
+```
+
+Both user and assistant messages are added to this list and sent back to the model on subsequent requests.
+
+This allows the model to use previous turns as conversational context.
+
+---
+
+### Experiment 3 — Tool Calling
+
+The third stage introduced the first external capability available to the LLM.
+
+A simple Python function was implemented:
+
+```python
+def get_current_time() -> str:
+    """Return the current UTC time."""
+    ...
+```
+
+The function is exposed to the model through Ollama's tool calling interface.
+
+The model does not execute the function directly. Instead, it produces a structured tool call:
+
+```text
+ToolCall(
+    function=Function(
+        name="get_current_time",
+        arguments={}
+    )
+)
+```
+
+The Python application then acts as the tool dispatcher.
+
+```text
+User
+  │
+  ▼
+LLM
+  │
+  │ tool call
+  ▼
+Python dispatcher
+  │
+  ▼
+get_current_time()
+  │
+  │ tool result
+  ▼
+LLM
+  │
+  ▼
+Final response
+```
+
+The current dispatcher explicitly maps the requested tool name to a Python function:
+
+```python
+if tool_name == "get_current_time":
+    tool_result = get_current_time()
+```
+
+This establishes an important security boundary:
+
+> The LLM can request an action, but the application controls whether and how that action is executed.
+
+---
+
+## Security Relevance
+
+This separation between model decision-making and tool execution is fundamental for agent security.
+
+A model may eventually request tools such as:
+
+```text
+execute_command
+read_file
+scan_network
+send_http_request
+```
+
+The application should not automatically assume that every requested action is safe.
+
+Future stages will explore:
+
+* Tool authorization
+* Input validation
+* Tool isolation
+* Excessive agency
+* Prompt injection leading to tool abuse
+* Malicious or compromised tools
+* MCP tool security
+
+The current `get_current_time` tool is intentionally harmless and does not provide access to the network, filesystem, shell, or other external systems.
+
+---
+
+## Roadmap
+
+The laboratory evolves incrementally:
+
+1. **Direct LLM interaction** — completed
+2. **Interactive conversation** — completed
+3. **Tool calling** — completed
+4. **Agent decision loop** — next
+5. **Multi-step tasks**
+6. **Observability**
+7. **Cybersecurity-oriented tools**
+8. **Security testing of the agent**
+
+The exact scope may evolve as the project progresses.
+
+---
+
+## Key Takeaways
+
+After the current stage:
+
+1. An LLM is not automatically an agent.
+2. Conversation history is application state.
+3. The Python application controls what context is sent to the model.
+4. The model can request a tool without executing it directly.
+5. The application controls tool execution.
+6. Tool execution creates a security boundary between model output and external actions.
+7. Tool calling is one of the fundamental building blocks of an AI agent.
+
+The next implementation step is to replace the isolated tool-calling experiment with a reusable agent decision loop.
