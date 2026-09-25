@@ -2,6 +2,8 @@ services:
   agent:
     image: ai-agents-lab02-agent:latest
     container_name: ai-agents-lab02-agent
+    stdin_open: true
+    tty: true
     networks:
       - llm-network
       - target-network
