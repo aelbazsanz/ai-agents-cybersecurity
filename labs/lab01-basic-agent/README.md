@@ -20,6 +20,8 @@ By completing this lab, you will understand:
 * How an application exposes tools to an LLM.
 * How to implement a tool registry and dispatcher.
 * How to build a basic agent loop.
+* How an agent can execute multiple tools.
+* The difference between multiple tool calls and sequential multi-step tasks.
 * The difference between an LLM, a conversational application, and an AI agent.
 * Why the application, rather than the LLM, must control tool execution.
 * Why tool execution represents an important security boundary.
@@ -98,6 +100,8 @@ The lab now implements a basic agent loop:
 
 The loop continues until the LLM produces a final response or the maximum number of iterations is reached.
 
+The agent can also process multiple tool calls returned by the LLM in the same response.
+
 ---
 
 ## Current State
@@ -111,16 +115,18 @@ The lab currently implements:
 * A generic tool registry.
 * A tool dispatcher.
 * A basic agent loop.
+* Multiple tool execution.
 * A maximum iteration limit to prevent unbounded execution.
 * Configuration through environment variables.
 
-The current tool is intentionally harmless:
+The current tools are intentionally harmless:
 
 ```text
+get_current_date()
 get_current_time()
 ```
 
-It returns the current UTC time.
+Both operate using UTC.
 
 ---
 
@@ -172,6 +178,7 @@ It maps tool names to Python functions:
 
 ```python
 TOOLS = {
+    "get_current_date": get_current_date,
     "get_current_time": get_current_time,
 }
 ```
@@ -189,7 +196,7 @@ Conceptually:
 ```text
 LLM
  │
- │ "get_current_time", {}
+ │ tool name + arguments
  ▼
 Registry
  │
@@ -317,16 +324,22 @@ The current agent loop can be tested with:
 uv run python src/lab01_basic_agent/agent_test.py
 ```
 
-A typical execution looks like:
+A typical multi-tool execution looks like:
 
 ```text
+[Agent] Tool requested: get_current_date
+[Agent] Arguments: {}
+[Agent] Tool result: 2026-09-25
+
 [Agent] Tool requested: get_current_time
 [Agent] Arguments: {}
-[Agent] Tool result: 2026-09-25T08:22:24.127985+00:00
+[Agent] Tool result: 2026-09-25T08:32:22.226836+00:00
 
 Final answer:
-The current UTC time is ...
+Today's UTC date is 2026-09-25, and the current UTC time is ...
 ```
+
+The exact wording of the final response depends on the LLM.
 
 ---
 
@@ -365,7 +378,7 @@ Small executable test for the agent loop.
 
 **`tools/basic.py`**
 
-Contains the implementation of the available tool.
+Contains the implementations of the available tools.
 
 **`tools/registry.py`**
 
@@ -469,6 +482,100 @@ This is the first point in the lab where the application behaves as a basic AI a
 
 ---
 
+### Experiment 6 — Multiple Tool Calls
+
+A second tool, `get_current_date()`, was introduced alongside `get_current_time()`.
+
+The test asks:
+
+```text
+Tell me today's UTC date and current UTC time.
+```
+
+The LLM returned two tool calls in the same response:
+
+```text
+get_current_date()
+get_current_time()
+```
+
+The agent loop processed both calls:
+
+```text
+LLM
+ ├── get_current_date()
+ │       ↓
+ │   2026-09-25
+ │
+ └── get_current_time()
+         ↓
+     2026-09-25T08:32:22...
+         ↓
+        LLM
+         ↓
+    Final response
+```
+
+This demonstrates that the agent is not limited to a single tool call per LLM response.
+
+The implementation handles this through:
+
+```python
+for tool_call in response.message.tool_calls:
+```
+
+Each requested tool is resolved through the registry and executed by the dispatcher.
+
+---
+
+## Multiple Tool Calls vs Sequential Multi-step Tasks
+
+These two concepts are related but not identical.
+
+### Multiple tool calls
+
+In the current experiment, the LLM requested both tools in the same response:
+
+```text
+LLM
+ ├── Tool A
+ └── Tool B
+ ↓
+LLM
+ ↓
+Final response
+```
+
+The tools are independent and their results do not determine which tool is requested next.
+
+### Sequential multi-step task
+
+A more advanced agent interaction would look like:
+
+```text
+LLM
+ ↓
+Tool A
+ ↓
+Tool A result
+ ↓
+LLM
+ ↓
+Tool B
+ ↓
+Tool B result
+ ↓
+LLM
+ ↓
+Final response
+```
+
+In this scenario, the result of the first tool becomes part of the agent's state and can influence the next decision made by the LLM.
+
+This will be the next stage of the multi-step task experiment.
+
+---
+
 ## Security Relevance
 
 The architecture introduced in this lab establishes several security boundaries that will become important in later experiments.
@@ -560,18 +667,19 @@ Future labs will also investigate threats such as:
 The current progression is:
 
 ```text
-1. Direct LLM interaction       — completed
-2. Interactive conversation     — completed
-3. Tool calling                 — completed
-4. Tool registry/dispatcher     — completed
-5. Agent decision loop          — completed
-6. Multi-step tasks             — next
-7. Observability                — planned
-8. Cybersecurity-oriented tools — planned
-9. Security testing of agent    — planned
+1. Direct LLM interaction        — completed
+2. Interactive conversation      — completed
+3. Tool calling                  — completed
+4. Tool registry/dispatcher      — completed
+5. Agent decision loop           — completed
+6. Multiple tool calls           — completed
+7. Sequential multi-step tasks   — next
+8. Observability                 — planned
+9. Cybersecurity-oriented tools  — planned
+10. Security testing of agent    — planned
 ```
 
-The next step will introduce a slightly more complex task requiring the agent to perform multiple operations rather than a single tool call.
+The next step will introduce a task where the result of one tool call becomes relevant to the agent's next decision.
 
 ---
 
@@ -584,7 +692,9 @@ At the end of the current stage:
 * A tool registry provides a controlled interface between the LLM and application capabilities.
 * A dispatcher resolves tool requests to concrete functions.
 * An agent loop allows repeated model/tool interactions.
+* An agent can process multiple tool calls returned in the same LLM response.
+* Multiple tool calls are not necessarily the same as a sequential multi-step task.
 * Maximum iteration limits provide a basic control against unbounded execution.
 * Tool access creates a security boundary that must be explicitly designed.
 
-The lab intentionally keeps the implementation small so these boundaries remain visible before introducing more complex agent frameworks or cybersecurity capabilities.
+The next experiment will investigate true sequential multi-step behavior, where the result of one tool execution becomes relevant to the next agent decision.
