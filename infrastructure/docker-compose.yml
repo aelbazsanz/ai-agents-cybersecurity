@@ -9,6 +9,9 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
+    networks:
+      - llm-network
+
     restart: unless-stopped
 
     healthcheck:
@@ -21,3 +24,7 @@ services:
 volumes:
   ollama_data:
     name: ai-agents-ollama-data
+
+networks:
+  llm-network:
+    name: ai-agents-llm
