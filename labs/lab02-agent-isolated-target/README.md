@@ -1,266 +1,30 @@
-# AI Agents Cybersecurity
+# Lab 02 — Agent Isolated Target
 
-A research and experimentation project focused on cybersecurity agents powered by Large Language Models (LLMs).
+Lab 02 introduces the first cybersecurity-focused environment in the project.
 
-The project explores how autonomous AI agents can perform cybersecurity tasks, how their capabilities emerge from the interaction between the LLM, the agent runtime, tools, permissions and the surrounding environment, and how these systems can be evaluated from a cybersecurity perspective.
+The objective is to build a small isolated cyber range where an LLM-powered agent can investigate a target system using explicitly defined tools.
 
-The goal is not to build a single cybersecurity product, but to create a collection of reproducible security laboratories where agent behavior can be observed, tested and analyzed.
+The laboratory is intentionally simple. It focuses on establishing the security boundaries between the agent, the shared LLM service, and the target before adding more advanced reconnaissance capabilities.
 
----
+## Objectives
 
-## Project Goals
+This laboratory explores:
 
-The project aims to explore:
+* Running an LLM-powered cybersecurity agent in an isolated environment.
+* Separating the agent from the target using Docker networks.
+* Allowing the agent to communicate with both the LLM service and the target.
+* Preventing the target from reaching the LLM service or the Internet.
+* Giving the agent explicit cybersecurity tools instead of arbitrary command execution.
+* Observing how the LLM decides when and how to use those tools.
+* Building the foundation for autonomous reconnaissance experiments.
 
-* How LLMs can be used as autonomous cybersecurity agents.
-* How an agent runtime translates LLM decisions into real actions.
-* How tools extend an agent's capabilities.
-* How permissions and security policies constrain agent behavior.
-* How agents interact with isolated cybersecurity environments.
-* How external information can influence agent decisions.
-* How autonomous agents can perform reconnaissance and other security tasks.
-* How agent architectures can introduce new security risks.
-* How established cybersecurity frameworks can be applied to AI-driven security scenarios.
-* How agent behavior can be observed and reproduced experimentally.
+The laboratory does not use LangChain, LangGraph, MCP, or other agent frameworks.
 
-A core principle of the project is:
-
-> **LLM capability != Agent Runtime capability != Tool capability**
-
-The LLM may decide what should happen, but the runtime controls what can actually happen.
-
----
-
-## Project Philosophy
-
-The laboratories are designed as controlled experiments rather than demonstrations designed to prove a predefined security classification.
-
-The general workflow is:
-
-```text
-Threat Scenario
-      │
-      ▼
-Laboratory Architecture
-      │
-      ▼
-Experiment
-      │
-      ▼
-Observed Agent Behavior
-      │
-      ▼
-Evidence
-      │
-      ▼
-Security Analysis
-      │
-      ├── OWASP LLM
-      ├── OWASP Agentic
-      ├── MITRE ATLAS
-      └── MITRE ATT&CK
-```
-
-Framework mappings are applied **after observing the behavior**, when a mapping is justified.
-
-The project does not modify experiments simply to force them to demonstrate a particular OWASP or MITRE technique.
-
----
+The agent runtime is implemented directly in Python.
 
 ## Architecture
 
-The project separates shared infrastructure from individual laboratories.
-
-```text
-ai-agents-cybersecurity/
-│
-├── infrastructure/
-│   └── Shared services
-│
-├── labs/
-│   ├── lab01-...
-│   ├── lab02-...
-│   └── ...
-│
-└── README.md
-```
-
-### Shared Infrastructure
-
-The `infrastructure/` directory contains services shared by multiple laboratories.
-
-Currently this includes:
-
-* Ollama
-* Shared LLM Docker network
-* Persistent Ollama model storage
-
-The shared infrastructure is intentionally kept separate from individual laboratory environments.
-
-### Laboratories
-
-Each laboratory owns its own:
-
-* Agent
-* Target systems
-* Target networks
-* Docker configuration
-* Python environment
-* Tools
-* Experiments
-* Documentation
-
-A laboratory should be independently reproducible and removable without destroying shared infrastructure.
-
----
-
-## AI and Agent Architecture
-
-The project deliberately distinguishes several layers of an AI agent:
-
-```text
-                  ┌──────────────┐
-                  │     User     │
-                  └──────┬───────┘
-                         │
-                         ▼
-                  ┌──────────────┐
-                  │     LLM      │
-                  │              │
-                  │ Decision /   │
-                  │ Reasoning    │
-                  └──────┬───────┘
-                         │
-                    tool request
-                         │
-                         ▼
-                  ┌──────────────┐
-                  │ Agent Runtime│
-                  │              │
-                  │ Tool control │
-                  │ Policy       │
-                  │ Execution    │
-                  └──────┬───────┘
-                         │
-                         ▼
-                  ┌──────────────┐
-                  │    Tools     │
-                  └──────┬───────┘
-                         │
-                         ▼
-                  ┌──────────────┐
-                  │ Environment  │
-                  │ / Target     │
-                  └──────────────┘
-```
-
-This separation is important because an LLM's reasoning or tool-calling capability does not automatically imply that the agent has the corresponding real-world capability.
-
-The runtime determines which actions can actually be executed.
-
----
-
-## Security Boundaries
-
-Security isolation is a fundamental part of the project.
-
-The general model is:
-
-```text
-                    HOST
-                      │
-          ┌───────────┴───────────┐
-          │                       │
-     Shared LLM Network       Lab Network
-          │                    (isolated)
-          │                       │
-       Ollama                Agent ─── Target
-```
-
-Laboratories should avoid unnecessary access to the host system.
-
-Where appropriate:
-
-* Targets run inside dedicated Docker networks.
-* Target networks may be `internal`.
-* Agents may have access to multiple isolated networks when required by the experiment.
-* Targets should not have direct access to shared LLM infrastructure unless explicitly required.
-* Host ports should only be exposed when required.
-* Docker socket access is avoided.
-* Privileged containers are avoided.
-* Arbitrary host filesystem access is avoided.
-* Arbitrary command execution is avoided unless explicitly required by a future experiment.
-
-Security boundaries are part of the experiment itself and should be documented for every laboratory.
-
----
-
-## Technology
-
-The project currently uses:
-
-* Python
-* `uv`
-* Docker
-* Docker Compose
-* Ollama
-* Qwen models
-* Git / GitHub
-
-Agent frameworks such as LangChain or LangGraph are intentionally not introduced at the beginning of the project.
-
-The initial laboratories implement the agent runtime directly in Python in order to make its behavior and security boundaries explicit.
-
-Frameworks may be introduced later when they are themselves relevant to an experiment.
-
----
-
-# Laboratories
-
-## Lab 01 — Basic Agent
-
-**Status:** Completed
-
-Lab 01 establishes the basic architecture of an agent runtime without using an agent framework.
-
-The laboratory explores:
-
-* LLM communication
-* Conversation history
-* Tool definitions
-* Tool registry
-* Tool dispatch
-* Tool calling
-* Sequential tool calls
-* Multiple tool calls
-* Basic permissions
-* Error handling
-* Iteration limits
-* Basic observability
-
-The laboratory establishes the conceptual separation:
-
-```text
-LLM capability
-      !=
-Agent Runtime capability
-      !=
-Tool capability
-```
-
-Lab 01 is considered closed and is not modified as the project evolves.
-
----
-
-## Lab 02 — Agent Isolated Target
-
-**Status:** In development
-
-Lab 02 introduces the first cybersecurity-oriented agent laboratory.
-
-The objective is to build a small cyber range where an autonomous agent performs network reconnaissance against an isolated target.
-
-The current architecture is:
+The laboratory uses two Docker networks.
 
 ```text
                          HOST
@@ -268,303 +32,407 @@ The current architecture is:
                  ┌─────────┴─────────┐
                  │                   │
            LLM Network          Target Network
+         (shared network)          (internal)
                  │                   │
               Ollama                Agent
-                                     │
-                                     │
-                                     ▼
-                                   Target
+                 ▲                ╱      │
+                 │               ╱       │
+                 └──────────────╯        │
+                                         ▼
+                                      Target
 ```
 
-The Agent has access to two Docker networks:
+### LLM Network
+
+The LLM network is the shared Docker network used by the project's infrastructure.
 
 ```text
 ai-agents-llm
-      │
-      └── Agent ──── Ollama
+```
 
+It provides connectivity between the agent and the shared Ollama service.
+
+The agent accesses Ollama using Docker DNS:
+
+```text
+http://ollama:11434
+```
+
+This network is intentionally shared because Ollama is an infrastructure service that can be reused by multiple laboratories.
+
+### Target Network
+
+The target network belongs exclusively to Lab 02.
+
+It is an internal Docker network:
+
+```text
 target-network
-      │
-      ├── Agent
-      └── Target
 ```
 
-The target network is isolated from external networks.
-
-The Agent is not configured as a router, NAT gateway or generic network forwarder.
-
-### Current Target
-
-The target is a minimal Python HTTP service running inside its own container.
-
-It currently exposes:
+Only the following containers are connected to it:
 
 ```text
-TCP/8080
+Agent
+Target
 ```
 
-with:
+The network is not exposed to the host or external networks.
+
+The agent accesses the target using Docker DNS:
 
 ```text
-GET /
-GET /health
+target
 ```
 
-The target does not expose host ports through Docker Compose.
+### Agent Network Interfaces
 
-### Current Agent Capability
+The agent has access to both networks:
 
-The first implemented reconnaissance tool is:
+```text
+Agent
+ ├── ai-agents-llm
+ │      └── Ollama
+ │
+ └── target-network
+        └── Target
+```
+
+The agent is **not configured as a router**.
+
+It does not provide:
+
+* IP forwarding
+* NAT
+* packet forwarding
+* proxying
+* generic network routing
+
+The agent simply uses its own network interfaces to communicate with the services it is explicitly connected to.
+
+## Security Boundaries
+
+The intended communication model is:
+
+| Source   | Destination | Expected                          |
+| -------- | ----------- | --------------------------------- |
+| Agent    | Ollama      | Allowed                           |
+| Agent    | Target      | Allowed                           |
+| Target   | Agent       | Network-level connectivity exists |
+| Target   | Ollama      | Not connected                     |
+| Target   | Internet    | Not connected                     |
+| Target   | Host        | Not exposed                       |
+| Host     | Target      | Not exposed                       |
+| Internet | Target      | Not exposed                       |
+
+The target does not publish any ports to the host.
+
+The agent does not publish any ports either.
+
+The only externally published port in the current environment is the shared Ollama service port.
+
+## Target
+
+The target is intentionally minimal.
+
+It is a custom container based on:
+
+```text
+python:3.12-slim
+```
+
+The target runs a small HTTP server listening on:
+
+```text
+0.0.0.0:8080
+```
+
+The service currently exposes the following HTTP endpoints.
+
+### `/`
+
+Returns:
+
+```text
+Cyber Range Target
+Service: HTTP
+Environment: lab02
+```
+
+### `/health`
+
+Returns:
+
+```text
+OK
+```
+
+### Other paths
+
+Unknown paths return:
+
+```text
+404 Not Found
+```
+
+The target is deliberately simple at this stage.
+
+The agent is not given the target's IP address or HTTP service information directly. It must discover information through its available tools.
+
+## Agent
+
+The Lab 02 agent is implemented directly in Python without an agent framework.
+
+Its main components are:
+
+```text
+Agent
+ ├── LLM client
+ ├── conversation history
+ ├── tool definitions
+ ├── tool dispatcher
+ └── tool execution
+```
+
+The agent connects to Ollama using the environment variables:
+
+```text
+OLLAMA_HOST=http://ollama:11434
+OLLAMA_MODEL=qwen3:8b
+```
+
+The target hostname is provided through:
+
+```text
+TARGET_HOST=target
+```
+
+### Agent Loop
+
+The current execution flow is:
+
+```text
+User input
+    │
+    ▼
+   LLM
+    │
+    ├── final response ──────────────► User
+    │
+    └── tool call
+          │
+          ▼
+     Tool Dispatcher
+          │
+          ▼
+      Tool execution
+          │
+          ▼
+       Tool result
+          │
+          └──────────────► LLM
+```
+
+The LLM decides whether to call an available tool.
+
+The agent runtime executes the requested tool and returns the result to the LLM.
+
+The runtime does not execute arbitrary commands generated by the model.
+
+## Current Tooling
+
+The first reconnaissance tool implemented in Lab 02 is:
 
 ```text
 resolve_host(host)
 ```
 
-The agent can use this tool to resolve the target hostname through Docker DNS.
+It resolves a hostname using the Python networking APIs.
+
+Example:
+
+```text
+resolve_host("target")
+```
+
+Example result:
+
+```json
+{
+  "host": "target",
+  "resolved": true,
+  "ip": "172.18.0.3"
+}
+```
+
+The IP address is dynamically assigned by Docker and must not be hardcoded.
+
+Additional reconnaissance tools will be introduced incrementally in later steps of the laboratory.
+
+## Observability
+
+Tool execution is currently logged to the agent's standard output.
+
+For example:
+
+```text
+[TOOL] resolve_host args={"host": "target"}
+[RESULT] {"host": "target", "resolved": true, "ip": "172.18.0.3"}
+```
+
+This provides basic evidence of:
+
+* which tool the LLM requested,
+* which arguments were supplied,
+* and what result was returned.
+
+More structured observability will be added as the laboratory evolves.
+
+## Running the Laboratory
+
+The shared infrastructure must be running before starting Lab 02.
+
+From the Lab 02 directory:
+
+```bash
+docker compose up -d
+```
+
+Check the containers:
+
+```bash
+docker compose ps
+```
+
+The expected services are:
+
+```text
+agent
+target
+```
+
+The agent can be started interactively with:
+
+```bash
+docker compose exec agent uv run python -m lab02_agent_isolated_target.main
+```
+
+The interactive agent provides a prompt:
+
+```text
+Lab 02 Agent
+Type 'exit' or 'quit' to stop.
+
+>
+```
+
+For example:
+
+```text
+> Resolve the hostname "target"
+```
+
+The agent may then request:
+
+```text
+[TOOL] resolve_host args={"host": "target"}
+```
+
+followed by the tool result.
+
+## Environment Variables
+
+The laboratory currently uses:
+
+```text
+OLLAMA_HOST=http://ollama:11434
+OLLAMA_MODEL=qwen3:8b
+TARGET_HOST=target
+```
+
+These values are provided through Docker Compose.
+
+No target IP addresses are hardcoded.
+
+## Current Experiment
+
+The first experiment is focused on basic target discovery.
+
+The intended user request is:
+
+```text
+Investigate the target and determine which network services are exposed.
+```
+
+At the current stage, the agent only has hostname resolution available.
 
 Further reconnaissance capabilities will be added incrementally.
 
----
+The goal is to observe the agent's behavior rather than force a predetermined execution sequence.
 
-# Security Frameworks
+## Security Framework Mapping
 
-Security frameworks are used as **analysis and classification frameworks**, not as a checklist that every laboratory must satisfy.
+Framework mapping is performed **after observing the actual behavior of the experiment**.
 
-The project currently considers four complementary perspectives.
+The laboratory may eventually be analyzed using:
 
-## OWASP Top 10 for LLM Applications
-
-Used primarily to analyze security risks associated with LLM-powered applications.
-
-Examples may include:
-
-* Prompt injection
-* Sensitive information disclosure
-* Improper output handling
-* Supply-chain risks
-* Other risks applicable to LLM-based systems
-
-Mappings will only be made when the laboratory produces relevant evidence.
-
-## OWASP Top 10 for Agentic Applications
-
-Used to analyze risks arising specifically from autonomous agent architectures.
-
-This is particularly relevant when laboratories include:
-
-* Tool use
-* Autonomous decisions
-* Planning
-* Permissions
-* External systems
-* Memory
-* Agent-to-agent interaction
-* Autonomous actions
-
-## MITRE ATLAS
-
-Used to analyze adversarial behavior targeting AI and machine-learning systems, including agentic AI systems.
-
-ATLAS provides a perspective focused on attacks against AI-enabled systems and their capabilities.
-
-## MITRE ATT&CK
-
-Used to describe traditional cybersecurity behavior performed by an agent.
-
-For example, an agent performing network service discovery may map to traditional ATT&CK reconnaissance or discovery techniques.
-
----
-
-## Framework Mapping Philosophy
-
-The project deliberately avoids designing laboratories solely to satisfy framework categories.
-
-Instead:
-
-```text
-Experiment
-    │
-    ▼
-Observed behavior
-    │
-    ▼
-Security interpretation
-    │
-    ▼
-Applicable framework mappings
-```
-
-A single experiment may map to:
-
-* OWASP LLM
-* OWASP Agentic
+* OWASP Top 10 for LLM Applications
+* OWASP Top 10 for Agentic Applications
 * MITRE ATLAS
 * MITRE ATT&CK
 
-or to none of them.
+No framework category is assigned merely because a tool or component exists.
 
-Mappings should be justified by the observed behavior and documented evidence.
+A behavior is mapped only when there is sufficient evidence that the corresponding security concept or technique is relevant.
 
----
+An experiment may map to:
 
-# Laboratory Documentation
+* one framework,
+* several frameworks,
+* or none.
 
-Each laboratory should document, where applicable:
-
-* Objective
-* Architecture
-* Components
-* Responsibilities
-* Network topology
-* Security boundaries
-* Trust boundaries
-* Agent capabilities
-* Agent limitations
-* Tools
-* Experiment setup
-* Experiment inputs
-* Observed behavior
-* Tool calls
-* Results
-* Security implications
-* Framework mappings
-* Lessons learned
-
-Documentation should distinguish clearly between:
+The mapping process is:
 
 ```text
-Expected behavior
-Observed behavior
-Interpretation
-Security classification
-```
-
-This distinction is important when studying autonomous systems because the behavior selected by the LLM may differ from the behavior expected by the experiment designer.
-
----
-
-# Observability
-
-Agent actions should be observable and reproducible.
-
-Where possible, tool execution should record:
-
-```text
-timestamp
-tool
-arguments
-result
-duration
-```
-
-For example:
-
-```text
-[12:01:04] TOOL resolve_host
-           args={"host":"target"}
-
-[12:01:04] RESULT
-           {"ip":"172.18.0.3"}
-```
-
-As the agent runtime becomes more sophisticated, observability will be extended to include decisions, policies, errors and execution flow.
-
----
-
-# Development Principles
-
-The project follows several development principles.
-
-### Incremental development
-
-Capabilities are added one at a time.
-
-For example:
-
-```text
-resolve_host()
+Threat Scenario
       ↓
-check_tcp_port()
+Laboratory Architecture
       ↓
-http_get()
+Experiment
       ↓
-more advanced capabilities
+Observed Agent Behavior
+      ↓
+Evidence
+      ↓
+Security Analysis
+      ├── OWASP LLM
+      ├── OWASP Agentic
+      ├── MITRE ATLAS
+      └── MITRE ATT&CK
 ```
 
-Each capability should be implemented, tested and committed independently whenever practical.
+## Current Status
 
-### Explicit runtime control
+### Implemented
 
-The LLM should not directly control the environment.
+* [x] Shared Ollama Docker network
+* [x] Isolated Lab 02 target network
+* [x] Dual-network agent
+* [x] Minimal HTTP target
+* [x] Direct Python agent runtime
+* [x] Ollama integration
+* [x] Agent tool-calling loop
+* [x] `resolve_host` tool
+* [x] Basic tool execution logging
+* [x] Interactive agent execution
 
-The runtime mediates access to tools and external systems.
+### Planned
 
-### Minimal privileges
+* [ ] TCP port checking
+* [ ] HTTP service interaction
+* [ ] Complete basic reconnaissance experiment
+* [ ] Structured experiment evidence
+* [ ] Security analysis
+* [ ] OWASP / MITRE framework mapping based on observed behavior
 
-Agents and targets receive only the network and system capabilities required by the experiment.
-
-### Reproducibility
-
-Laboratories should be reproducible from the repository.
-
-### Isolation
-
-A laboratory should be independently startable, testable and destroyable without affecting unrelated laboratories or shared infrastructure.
-
-### Evidence-driven analysis
-
-Security conclusions should be based on observed behavior and collected evidence rather than assumptions about what the model "should" do.
-
----
-
-# Git Workflow
-
-Development is performed incrementally.
-
-Changes should generally follow:
-
-```text
-Design
-  ↓
-Implementation
-  ↓
-Test
-  ↓
-Observe
-  ↓
-Document
-  ↓
-Git commit
-  ↓
-Next increment
-```
-
-Small commits are preferred because they make laboratory evolution and experimental results easier to understand.
-
----
-
-# Project Status
-
-The project is actively evolving.
-
-Current status:
-
-```text
-Infrastructure
-    └── Shared Ollama environment       ✓
-
-Lab 01
-    └── Basic agent runtime             ✓ Completed
-
-Lab 02
-    ├── Isolated target                 ✓
-    ├── Dual-network agent              ✓
-    ├── Ollama connectivity             ✓
-    ├── Interactive agent runtime       ✓
-    ├── resolve_host()                  ✓
-    ├── check_tcp_port()                └── Planned
-    ├── http_get()                      └── Planned
-    └── Reconnaissance experiments      └── Planned
-```
-
-The project will evolve incrementally as new agent capabilities, security scenarios and experiments are introduced.
+New capabilities will be added incrementally so that each change can be tested and documented independently.
