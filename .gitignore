@@ -5,4 +5,7 @@ __pycache__/
 *.py[cod]
 
 # Raw audit evidence
-audit/**/evidence/*.raw.txt
+**/audit/**/evidence/*.raw.txt
+
+# Private audit material
+**/audit/private/
