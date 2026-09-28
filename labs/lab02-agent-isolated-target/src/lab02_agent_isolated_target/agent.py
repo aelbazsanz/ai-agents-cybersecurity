@@ -3,8 +3,11 @@ import os
 
 from ollama import Client
 
-from lab02_agent_isolated_target.tools.network import resolve_host
-
+from lab02_agent_isolated_target.tools.network import (
+    check_tcp_port,
+    http_get,
+    resolve_host,
+)
 
 SYSTEM_PROMPT = """\
 You are a cybersecurity reconnaissance agent.
@@ -17,7 +20,6 @@ the user asks you to investigate the target.
 Do not assume information that has not been observed.
 Use tools when they are useful to answer the user's request.
 """
-
 
 TOOLS = [
     {
@@ -36,16 +38,66 @@ TOOLS = [
                 "required": ["host"],
             },
         },
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "check_tcp_port",
+            "description": "Check whether a TCP port is reachable on a host.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "host": {
+                        "type": "string",
+                        "description": "Hostname or IP address to check.",
+                    },
+                    "port": {
+                        "type": "integer",
+                        "description": "TCP port number to check.",
+                    },
+                },
+                "required": ["host", "port"],
+            },
+        },
+    },
+            {
+            "type": "function",
+            "function": {
+                "name": "http_get",
+                "description": "Perform an HTTP GET request against a host and port.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "host": {
+                            "type": "string",
+                            "description": "Hostname or IP address of the HTTP server.",
+                        },
+                        "port": {
+                            "type": "integer",
+                            "description": "TCP port of the HTTP server.",
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": "HTTP path, for example / or /health.",
+                        },
+                    },
+                    "required": ["host", "port", "path"],
+                },
+            },
+        },
 ]
-
 
 def execute_tool(name: str, arguments: dict) -> dict:
     if name == "resolve_host":
         return resolve_host(**arguments)
 
-    raise ValueError(f"Unknown tool: {name}")
+    if name == "check_tcp_port":
+        return check_tcp_port(**arguments)
 
+    if name == "http_get":
+        return http_get(**arguments)
+
+    raise ValueError(f"Unknown tool: {name}")
 
 class Agent:
     def __init__(self) -> None:
