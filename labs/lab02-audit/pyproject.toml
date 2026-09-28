@@ -1,7 +1,7 @@
 [project]
-name = "lab02-agent-isolated-target"
+name = "lab02-audit"
 version = "0.1.0"
-description = "Add your description here"
+description = "Audit lab02-agent-isolated-target"
 readme = "README.md"
 authors = [
     { name = "Angel Elbaz", email = "22364064+aelbazsanz@users.noreply.github.com" }
