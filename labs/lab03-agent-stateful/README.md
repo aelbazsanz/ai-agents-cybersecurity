@@ -2,673 +2,729 @@
 
 ## Objective
 
-Lab 03 extends the isolated agent architecture introduced in Lab 02 by giving the agent access to a stateful web application and tools capable of modifying persistent state.
+Lab 03 extends the isolated, network-capable agent from Lab 02 into a stateful agent that can perform actions with persistent security-relevant side effects.
 
-The objective is to study the security implications of an agent that can move beyond network reconnaissance and perform actions with observable side effects.
+The main objective is to introduce a new security dimension:
 
-The lab introduces:
+> The agent is no longer limited to observing reachable resources. It can now read and modify application state through tools.
 
-* persistent application state
-* an explicit agent identity and execution context
-* resources with different authorization levels
-* read-only tools
-* state-changing tools
-* resource ownership
-* authorization decisions at the application boundary
+The laboratory therefore introduces:
 
-The lab is intentionally simple. It does not attempt to model a production authorization system or introduce an agent framework.
+* agent identity and execution context;
+* resource ownership and classification;
+* authorization decisions;
+* read-only and state-changing tools;
+* persistent application state;
+* observable side effects.
 
-The main conceptual transition is:
-
-```text
-Lab 02:
-
-LLM
- │
- ▼
-Agent
- │
- ▼
-Network Tools
- │
- ▼
-Network Reachability
-```
-
-to:
-
-```text
-Lab 03:
-
-LLM
- │
- ▼
-Agent
- │
- ▼
-Tools
- │
- ▼
-Authorization
- │
- ▼
-Action
- │
- ▼
-Persistent State
-```
-
-The purpose of this lab is to provide the capabilities and security boundaries that will later be examined in `lab03-audit`.
+The laboratory is intentionally implemented without an agent framework so that the authority exercised by the LLM, the tools, and the target application remains explicit and inspectable.
 
 ---
 
 ## Security Context
 
-Lab 02 demonstrated that an agent can have real network capabilities and that network-level isolation is different from application-level resource restrictions.
+Lab 02 established that an agent may have:
 
-Lab 03 introduces a different security dimension: **agentic actions against persistent state**.
+* network-capable tools;
+* model-controlled tool parameters;
+* network reachability to resources;
+* application-level access to resources outside an intended target.
 
-The agent is no longer limited to observing or reaching resources. It can invoke operations that can change the state of an external system.
+Lab 03 builds on that foundation.
 
-This creates a new security boundary:
+The central question changes from:
+
+> Can the agent reach a resource?
+
+to:
+
+> What can the agent do once it can act on a resource?
+
+and:
+
+> Can the agent perform actions outside the authority it is supposed to have?
+
+The progression is therefore:
 
 ```text
-                 Authorization Boundary
-                        │
-                        ▼
-LLM → Agent → Tool → Target Application → Persistent State
-                  │
-                  └── action requested
+Lab 01
+Basic agent
+    │
+    ▼
+Lab 02
+Network-capable agent
+    │
+    ├── capability
+    ├── parameter control
+    ├── network boundary
+    └── reachable resources
+    │
+    ▼
+Lab 03
+Stateful agent
+    │
+    ├── identity
+    ├── authorization
+    ├── state
+    └── side effects
 ```
-
-The important distinction is between:
-
-1. what the model requests,
-2. what the agent is capable of invoking,
-3. what the tool actually executes,
-4. what the target application authorizes,
-5. what state is ultimately changed.
-
-The lab should make these layers observable so that they can be investigated independently during the audit phase.
-
----
-
-## Scope
-
-Lab 03 focuses on **agent authority over application state**.
-
-The laboratory covers:
-
-* agent identity and context
-* resource ownership
-* resource classification
-* read operations
-* state-changing operations
-* authorization decisions
-* persistent state
-* observable side effects
-* tool-driven interaction with an external application
-
-The laboratory does not intentionally introduce:
-
-* prompt injection
-* indirect prompt injection
-* complex multi-agent architectures
-* autonomous long-running loops
-* external SaaS integrations
-* production authentication systems
-* production-grade identity management
-* complex databases
-* an agent construction framework such as LangChain or AutoGen
-
-Those capabilities may be introduced in later laboratories when they are useful for testing additional security properties.
 
 ---
 
 ## Architecture
 
-The architecture builds on the isolated network model used in Lab 02.
-
 ```text
-                     ┌───────────────┐
-                     │    Ollama     │
-                     └───────┬───────┘
-                             │
-                             ▼
-                     ┌───────────────┐
-                     │     Agent     │
-                     │               │
-                     │ identity:     │
-                     │ analyst       │
-                     └───────┬───────┘
-                             │
-                             │ HTTP tools
-                             ▼
-                     ┌───────────────────┐
-                     │ Target Web App    │
-                     │                   │
-                     │ Authorization     │
-                     │ Persistent State  │
-                     └─────────┬─────────┘
-                               │
-             ┌─────────────────┼─────────────────┐
-             │                 │                 │
-             ▼                 ▼                 ▼
-        Public Data      Analyst Data      Restricted Data
+                         ┌──────────────┐
+                         │    Ollama    │
+                         └──────┬───────┘
+                                │
+                                ▼
+                         ┌──────────────┐
+                         │    Agent     │
+                         │              │
+                         │ user=analyst │
+                         └──────┬───────┘
+                                │
+                         Agent tools
+                                │
+                                ▼
+                     ┌────────────────────┐
+                     │ Target Web         │
+                     │ Application        │
+                     │                    │
+                     │ ┌────────────────┐ │
+                     │ │ Authorization  │ │
+                     │ └───────┬────────┘ │
+                     │         │          │
+                     │ ┌───────▼────────┐ │
+                     │ │ Stateful       │ │
+                     │ │ records        │ │
+                     │ └────────────────┘ │
+                     └────────────────────┘
 ```
 
-The target remains a simple web application rather than introducing a separate database service.
+The network topology remains based on Lab 02:
 
-This keeps the laboratory architecture small while still providing persistent state and externally observable side effects.
+```text
+ai-agents-llm
+      │
+    Agent
+      │
+      │ target-network
+      │
+    Target
+```
+
+The target remains isolated on the internal `target-network`.
 
 ---
 
 ## Agent Identity
 
-The agent executes with an explicit application identity.
-
-The initial execution context is:
+The agent executes with the following configured identity:
 
 ```text
-user: analyst
-role: analyst
+AGENT_USER=analyst
 ```
 
-This identity is part of the laboratory design and provides a basis for authorization decisions.
+The identity is provided by the agent container environment.
 
-The identity is intentionally simple. It is not intended to represent a complete authentication or identity-management system.
+It is not a parameter exposed to the LLM through the record tools.
 
-The relevant security question is whether the identity and associated authorization context are actually respected when the agent performs actions against resources.
+The record tools automatically include the configured identity in requests to the target using:
+
+```http
+X-Agent-User: analyst
+```
+
+This header represents the agent execution context in the laboratory.
+
+It is **not intended to represent a strong authentication mechanism**. The laboratory uses it to make identity and authorization semantics explicit and observable.
+
+Authorization is enforced by the target application, not by the LLM.
 
 ---
 
 ## Resource Model
 
-The target application contains resources belonging to different security classes.
+The target application contains three resource classes.
 
-The initial resource classes are:
+| Resource class | Example      | Owner      | Analyst read | Analyst modify |
+| -------------- | ------------ | ---------- | -----------: | -------------: |
+| Public         | `record-001` | None       |          Yes |             No |
+| Analyst-owned  | `record-101` | `analyst`  |          Yes |            Yes |
+| Restricted     | `record-201` | `security` |           No |             No |
 
-| Resource class | Description                                                     |
-| -------------- | --------------------------------------------------------------- |
-| Public         | Data intended to be readable by any authorized application user |
-| Analyst-owned  | Data owned by the `analyst` identity                            |
-| Restricted     | Data that the `analyst` identity is not authorized to access    |
+Initial records include:
 
-The resource model should make ownership and authorization decisions explicit enough that they can be tested during the audit phase.
-
-An example conceptual dataset is:
+### Public records
 
 ```text
-public/
-  record-001
-  record-002
-
-analyst/
-  record-101
-  record-102
-
-restricted/
-  record-201
-  record-202
+record-001
+record-002
 ```
 
-The identifiers and exact implementation are implementation details. The security properties of the resource classes are the important part.
+These records are publicly readable.
+
+### Analyst-owned records
+
+```text
+record-101
+record-102
+```
+
+These records belong to the `analyst` identity.
+
+The analyst can read and modify them.
+
+### Restricted records
+
+```text
+record-201
+record-202
+```
+
+These records belong to the `security` context.
+
+The `analyst` identity cannot read or modify them.
 
 ---
 
 ## Authorization Model
 
-The initial authorization model is intentionally small.
+The target application performs authorization checks based on the resource classification and the requesting identity.
 
-For the `analyst` identity:
-
-| Resource           | Read | Modify | Delete |
-| ------------------ | ---: | -----: | -----: |
-| Public data        |  Yes |     No |     No |
-| Analyst-owned data |  Yes |    Yes |    Yes |
-| Restricted data    |   No |     No |     No |
-
-Creating a new record is authorized within the agent's permitted application context.
-
-The authorization model is a design contract for the target application.
-
-It should not be assumed that the existence of a tool or an HTTP endpoint constitutes authorization.
-
-The intended security boundary is:
+Conceptually:
 
 ```text
-Agent request
-     │
-     ▼
-Target application
-     │
-     ├── identify resource
-     ├── determine ownership/class
-     ├── evaluate authorization
-     │
-     ▼
-Allow / Deny
-     │
-     ▼
-State change
+                    analyst
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+        ▼              ▼              ▼
+     public         analyst        restricted
+        │             │              │
+      READ       READ / MODIFY       DENY
 ```
 
-The audit phase will determine whether the implemented system actually behaves according to this model.
+The authorization logic is deliberately located in the target application.
+
+The agent tools do not independently decide whether a resource is authorized.
+
+This separation is important for later security experiments because it allows the laboratory to distinguish:
+
+```text
+LLM decision
+     │
+     ▼
+Tool capability
+     │
+     ▼
+Agent identity
+     │
+     ▼
+Target authorization
+     │
+     ▼
+State-changing action
+```
 
 ---
 
-## Agent Tools
+## Stateful Target
 
-The agent receives tools for interacting with the target application.
+The target is a small HTTP application implemented with Python's standard library.
 
-The initial tool set is divided into read-only and state-changing operations.
-
-### Read-only tools
+It exposes a record-oriented API:
 
 ```text
-get_record()
+GET     /records
+GET     /records/<id>
+POST    /records
+PUT     /records/<id>
+DELETE  /records/<id>
+```
+
+The application maintains its state in:
+
+```text
+/tmp/records.json
+```
+
+The state is loaded when the target starts and written after state-changing operations.
+
+This provides observable state changes without introducing an external database service.
+
+---
+
+## Implemented Record Tools
+
+The first stateful agent tools are implemented in:
+
+```text
+src/lab03_agent_stateful/tools/records.py
+```
+
+### `get_record`
+
+Reads an individual record.
+
+```text
+get_record(record_id)
+```
+
+The `record_id` is controlled by the tool caller, while the agent identity is taken from the environment.
+
+### `list_records`
+
+Lists records visible to the current agent identity.
+
+```text
 list_records()
 ```
 
-These tools retrieve application state without modifying it.
+### `create_record`
 
-### State-changing tools
+Creates a new analyst-owned record.
 
 ```text
-create_record()
-update_record()
-delete_record()
+create_record(title, content)
 ```
 
-These tools can produce persistent side effects.
+The target assigns ownership using the requesting identity.
 
-The tools should perform real HTTP requests against the target application rather than modifying local agent state directly.
+The model does not directly choose the owner.
 
-This preserves the architecture:
+### `update_record`
+
+Modifies an existing analyst-owned record.
+
+```text
+update_record(record_id, title?, content?)
+```
+
+The target performs the authorization check before applying the modification.
+
+---
+
+## Tool Authorization Boundary
+
+The current implementation deliberately separates tool parameters from execution identity.
+
+For example:
 
 ```text
 LLM
  │
+ │ record_id = record-101
  ▼
-Agent
+get_record()
  │
+ │ X-Agent-User: analyst
  ▼
-Tool
- │
- ▼
-HTTP request
- │
- ▼
-Target application
- │
- ▼
-Persistent state
-```
-
----
-
-## Tool Semantics
-
-The conceptual tool model is:
-
-| Tool            | Side effect | Security relevance                          |
-| --------------- | ----------: | ------------------------------------------- |
-| `get_record`    |          No | Resource read authorization                 |
-| `list_records`  |          No | Resource enumeration and read authorization |
-| `create_record` |         Yes | Creation authority                          |
-| `update_record` |         Yes | Modification authority and ownership        |
-| `delete_record` |         Yes | Destructive authority and ownership         |
-
-The tools should expose enough parameters for the agent to operate on concrete resources.
-
-At the same time, the target application remains responsible for deciding whether the requested operation is authorized.
-
-The laboratory should therefore make it possible to distinguish:
-
-```text
-tool availability
-        ≠
-tool invocation
-        ≠
-application authorization
-        ≠
-successful state change
-```
-
----
-
-## Persistent State
-
-Unlike Lab 02, the target application maintains state across requests.
-
-The state should be observable through the application interface.
-
-For example:
-
-```text
-Initial state
-    │
-    ├── record-001
-    ├── record-101
-    └── record-201
-          │
-          ▼
-      Agent action
-          │
-          ▼
-     Target application
-          │
-          ▼
-    Updated state
-```
-
-State-changing operations must have an observable result.
-
-Examples include:
-
-* a new record appearing after `create_record`
-* an existing record changing after `update_record`
-* a record disappearing after `delete_record`
-
-The implementation should make these changes easy to verify manually and during the audit phase.
-
----
-
-## Side Effects
-
-Side effects are a central part of this laboratory.
-
-A successful tool invocation is not sufficient evidence that an action occurred.
-
-The laboratory should provide a way to verify the resulting application state.
-
-For example:
-
-```text
-Agent
-  │
-  │ update_record(record-101)
-  ▼
 Target
-  │
-  │ authorization
-  ▼
-State change
-  │
-  ▼
-GET record-101
-  │
-  ▼
-Observed new state
+ │
+ ├── resource lookup
+ ├── authorization
+ └── response
 ```
 
-This allows later experiments to establish a complete chain of evidence:
+The LLM can select the resource identifier.
+
+It cannot select a different identity through the tool arguments.
+
+This is an intentional design decision and will be relevant to future audit experiments.
+
+---
+
+## State-Changing Operations
+
+The target supports state-changing operations.
+
+For example:
 
 ```text
-model decision
-    ↓
-tool invocation
-    ↓
-HTTP request
-    ↓
-authorization decision
-    ↓
-application response
-    ↓
-persistent state change
+analyst
+   │
+   │ PUT /records/record-101
+   ▼
+Target
+   │
+   ├── authorization → allowed
+   │
+   └── state updated
 ```
+
+The resulting state can subsequently be observed through another request.
+
+The baseline has been manually verified to demonstrate:
+
+```text
+record-101
+    │
+    ├── GET → 200
+    ├── PUT → 200
+    └── subsequent GET → modified content
+```
+
+A request from `analyst` to the restricted record has also been verified:
+
+```text
+GET /records/record-201
+X-Agent-User: analyst
+
+→ HTTP 403 Forbidden
+```
+
+These observations establish the expected target-side authorization behavior before exposing the functionality to the LLM.
+
+---
+
+## Existing Network Tools
+
+Lab 03 retains the network tools inherited from Lab 02:
+
+```text
+resolve_host
+check_tcp_port
+http_get
+```
+
+They remain available in:
+
+```text
+src/lab03_agent_stateful/tools/network.py
+```
+
+They represent the network reconnaissance capability established in Lab 02.
+
+The new stateful record tools add a different class of authority:
+
+```text
+Network tools
+├── resolve_host
+├── check_tcp_port
+└── http_get
+
+Stateful tools
+├── get_record
+├── list_records
+├── create_record
+└── update_record
+```
+
+The security focus of Lab 03 is the second group.
+
+---
+
+## Current Implementation Status
+
+The following components are currently implemented and independently validated:
+
+| Component                       | Status                           |
+| ------------------------------- | -------------------------------- |
+| Lab 03 project structure        | Implemented                      |
+| Lab 02 network topology         | Retained                         |
+| Stateful target                 | Implemented                      |
+| Public records                  | Implemented                      |
+| Analyst-owned records           | Implemented                      |
+| Restricted records              | Implemented                      |
+| Target-side authorization       | Implemented                      |
+| JSON-backed state               | Implemented                      |
+| `get_record`                    | Implemented                      |
+| `list_records`                  | Implemented                      |
+| `create_record`                 | Implemented                      |
+| `update_record`                 | Implemented                      |
+| `delete_record`                 | Not yet exposed as an agent tool |
+| LLM integration of record tools | Not yet implemented              |
+| Agent baseline validation       | Pending                          |
+| Security audit                  | Not part of Lab 03               |
+
+The implementation is therefore intentionally incomplete at this checkpoint.
+
+---
+
+## Baseline Validation
+
+The target-side baseline has been independently tested before exposing the functionality to the LLM.
+
+Observed behavior includes:
+
+```text
+GET public record
+    → 200
+
+GET analyst-owned record as analyst
+    → 200
+
+GET restricted record as analyst
+    → 403
+
+UPDATE analyst-owned record as analyst
+    → 200
+
+GET modified record
+    → modified state observed
+```
+
+These tests establish the expected application behavior independently from model behavior.
 
 ---
 
 ## Security Boundaries
 
-Lab 03 introduces several boundaries that should remain conceptually separate.
+Lab 03 introduces several distinct boundaries:
 
-### Model boundary
+### Network boundary
 
-The LLM decides which tool to invoke and which parameters to provide.
+Inherited from Lab 02.
 
-### Agent boundary
+```text
+Agent
+  │
+  ▼
+target-network
+  │
+  ▼
+Target
+```
 
-The agent exposes and executes the available tools.
+### Identity boundary
 
-### Tool boundary
+The agent operates using:
 
-The tool translates an agent action into an HTTP request.
-
-### Authorization boundary
-
-The target application decides whether the requested operation is permitted.
+```text
+analyst
+```
 
 ### Resource boundary
 
-The target application determines which resources the requesting identity can access or modify.
+Resources have different ownership and classification:
+
+```text
+public
+analyst-owned
+restricted
+```
+
+### Authorization boundary
+
+The target decides whether the current identity can perform the requested operation.
 
 ### State boundary
 
-The target application persists the resulting state.
+Some tools can change persistent application state.
 
-These boundaries allow later experiments to determine where a security property is enforced and where it is not.
-
----
-
-## Expected Baseline Behavior
-
-Before beginning the audit phase, the implementation should establish the intended baseline behavior.
-
-For the `analyst` identity:
-
-### Public resources
-
-The agent should be able to read public resources.
-
-It should not be able to modify or delete them.
-
-### Analyst-owned resources
-
-The agent should be able to read and modify resources owned by the `analyst`.
-
-It should also be able to delete resources where the authorization model permits deletion.
-
-### Restricted resources
-
-The agent should not be able to read, modify, or delete restricted resources.
-
-### Creation
-
-The agent should be able to create resources within the authorization context defined by the application.
-
-The exact resource ownership semantics for newly created resources must be explicit in the implementation.
-
----
-
-## Observability
-
-The laboratory should provide sufficient observability to establish what happened during an experiment.
-
-At minimum, the following should be distinguishable:
-
-```text
-User / agent context
-Tool selected
-Tool parameters
-HTTP request
-HTTP response
-Authorization result
-State before action
-State after action
-```
-
-This is important because an agent may:
-
-* decide to perform an action,
-* invoke a tool,
-* receive an authorization failure,
-* or successfully modify state.
-
-These are different observations and must not be conflated.
+These boundaries should remain conceptually separate.
 
 ---
 
 ## Security Questions
 
-Lab 03 is designed to support investigation of questions such as:
+The laboratory is designed to support future experiments around questions such as:
 
-1. Can the agent invoke state-changing tools?
-2. Can the model select the resource affected by a state-changing operation?
-3. Does the target application enforce resource ownership?
-4. Are authorization decisions made independently of the model's instructions?
-5. Can the agent modify resources outside its intended authorization scope?
-6. Can the agent delete resources outside its intended authorization scope?
-7. Does tool chaining produce a security-relevant action that individual tools do not reveal in isolation?
-8. Is the identity used by the agent consistently enforced by the target application?
-9. Does the backend authority exceed the authority intended for the agent?
-10. Can an action that is individually permitted be combined with another permitted action to produce an unintended security-relevant result?
+1. Does the agent respect resource authorization boundaries?
+2. Can the LLM cause a tool to operate on resources outside its intended scope?
+3. Can tool chaining produce security-relevant state changes?
+4. Does the agent distinguish between information it can read and actions it is authorized to perform?
+5. Can user-controlled input influence state-changing actions in unsafe ways?
+6. Does the separation between user authority, agent authority, and backend authority remain intact?
+7. Can the agent cause state changes without sufficient authorization or confirmation?
 
-These are **audit questions**, not findings.
-
-No security finding should be recorded until the relevant behavior has been demonstrated and its security impact established.
+These questions are intentionally not answered by the baseline implementation.
 
 ---
 
-## Relationship to Lab 02
+## Intended Lab03-Audit Direction
 
-Lab 03 builds directly on the lessons from Lab 02 and `lab02-audit`.
+`lab03-audit` will be created only after Lab 03 is frozen.
 
-Lab 02 focused on network capability and reachability.
-
-The important progression is:
+Potential audit areas include:
 
 ```text
-Lab 02
+Authorization boundary
+        │
+        ├── resource selection
+        ├── ownership
+        └── restricted resources
 
-Can the agent reach a resource?
+State-changing authority
+        │
+        ├── create
+        ├── update
+        └── delete
 
-        ↓
+Tool chaining
+        │
+        └── multi-step actions
 
-Lab 03
-
-What can the agent do once it can interact with a resource?
+Authority confusion
+        │
+        ├── user authority
+        ├── agent authority
+        └── backend authority
 ```
 
-This distinction is important because:
+Later experiments may also introduce adversarial or indirectly controlled input.
 
-```text
-Capability
-    ≠
-Reachability
-    ≠
-Authorization
-    ≠
-Security impact
-```
-
-Lab 03 therefore moves the security analysis from network boundaries toward **agent authority and application state**.
-
----
-
-## Intended Audit Direction
-
-A future `lab03-audit` should be created only after this laboratory is implemented, tested, documented, and frozen.
-
-The audit may investigate areas such as:
-
-* authorization boundary enforcement
-* excessive agency
-* state-changing tool authority
-* resource ownership enforcement
-* destructive actions
-* tool chaining
-* authorization confusion
-* confused-deputy behavior
-* differences between agent authority and backend authority
-
-The audit should use controlled experiments and reproducible evidence.
-
-Potential findings must not be assumed in advance.
+No bypass or vulnerability is intentionally embedded in the baseline.
 
 ---
 
 ## Evidence Standard
 
-A behavior should only become a security finding when the following chain can be demonstrated:
+A security finding should only be recorded when the experiment demonstrates observable security impact.
+
+The laboratory distinguishes:
 
 ```text
-Capability
-    ↓
-Observed behavior
-    ↓
-Security-relevant boundary crossed
-    ↓
-Concrete impact
-    ↓
-Reproducible evidence
+Claimed capability
+        ↓
+Observed capability
+        ↓
+Implemented capability
+        ↓
+Reachable capability
+        ↓
+Exploitable capability
 ```
 
-The existence of a tool, endpoint, or model capability is not by itself a vulnerability.
+A tool being available does not by itself establish a vulnerability.
 
 Similarly:
 
 ```text
-"the agent can call update_record"
+Tool capability
+≠
+Network reachability
+≠
+Authorization
+≠
+Security impact
 ```
 
-does not establish:
-
-```text
-"the agent can update an unauthorized record"
-```
-
-The latter requires an experiment demonstrating the unauthorized action and its resulting impact.
+This distinction follows the methodology established in the previous laboratories.
 
 ---
 
 ## Framework Mapping
 
-Security framework mappings should be added only after the underlying behavior has been demonstrated.
+OWASP and MITRE ATT&CK / ATLAS references should be added only when supported by demonstrated behavior.
 
-Potential mappings may include relevant concepts from:
+Framework mappings provide context and traceability.
 
-* OWASP guidance for LLM and agent security
-* MITRE ATLAS
-* MITRE ATT&CK where applicable
+They are not evidence of a vulnerability by themselves.
 
-Framework categories are used for traceability and communication.
+Potential future areas include:
 
-They are not used as evidence of a vulnerability.
+* excessive agency;
+* authorization failures;
+* unsafe tool use;
+* agentic action chains;
+* confused-deputy-style behavior.
 
-The implementation and experimental evidence remain the primary source of truth.
+The final mapping will depend on the actual observations produced during `lab03-audit`.
 
 ---
 
 ## Implementation Constraints
 
-The laboratory should remain intentionally small and understandable.
+Lab 03 intentionally keeps the implementation simple.
 
-The implementation should:
+### No agent framework
 
-* use Python
-* use the existing project tooling
-* keep the agent implementation explicit
-* keep tool definitions easy to inspect
-* use the existing Ollama-based architecture
-* keep the target application simple
-* avoid unnecessary dependencies
-* avoid introducing an agent framework
-* keep state and authorization behavior visible
-* make security-relevant actions reproducible
+The agent remains a small Python implementation using Ollama tool calling.
 
-The goal is to create an environment where the security behavior can be understood from the source code and reproduced from the documented commands.
+### No external database
+
+State is represented by a JSON file in the target container.
+
+### Explicit tools
+
+Every security-relevant capability should be visible as an explicit Python function.
+
+### Explicit identity
+
+The agent identity is configured outside the LLM tool parameters.
+
+### Backend authorization
+
+Authorization decisions are enforced by the target application.
+
+### Observable effects
+
+State-changing operations must produce observable changes that can be independently verified.
 
 ---
 
 ## Directory Structure
 
-The laboratory follows the structure established by Lab 02:
-
 ```text
 lab03-agent-stateful/
 ├── docker-compose.yml
 ├── Dockerfile
-├
+├── pyproject.toml
+├── README.md
+├── src/
+│   └── lab03_agent_stateful/
+│       ├── agent.py
+│       ├── main.py
+│       └── tools/
+│           ├── __init__.py
+│           ├── network.py
+│           └── records.py
+└── target/
+    ├── app.py
+    └── Dockerfile
 ```
+
+---
+
+## Completion Criteria
+
+Lab 03 will be considered complete when:
+
+* the stateful target is implemented;
+* the resource and authorization model is documented;
+* agent identity is explicit;
+* read and state-changing tools are implemented;
+* the LLM can invoke the stateful tools;
+* authorized operations work;
+* unauthorized operations are denied;
+* state changes are observable and reproducible;
+* the baseline behavior is documented;
+* the implementation is frozen before creating `lab03-audit`.
+
+The audit phase will then start from the frozen Lab 03 baseline.
+
+---
+
+## Progression
+
+```text
+Lab 01
+Basic agent
+    │
+    ▼
+Lab 02
+Network-capable isolated agent
+    │
+    ▼
+Lab 02-audit
+Capability and boundary experiments
+    │
+    ▼
+Lab 03
+Stateful agent
+    │
+    ├── identity
+    ├── authorization
+    ├── state
+    └── side effects
+    │
+    ▼
+Lab 03-audit
+Authorization and agentic action experiments
+```
+
+The purpose of this progression is to increase agent authority incrementally while keeping each new security property independently observable and testable.

@@ -1,287 +1,281 @@
+from __future__ import annotations
+
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from urllib.parse import urlparse
 
 HOST = "0.0.0.0"
 PORT = 8080
+STATE_FILE = Path("/tmp/records.json")
 
-AGENT_USER = "analyst"
-
-
-RECORDS = {
+INITIAL_RECORDS = {
     "record-001": {
         "id": "record-001",
-        "owner": None,
+        "title": "Public security bulletin",
+        "content": "This record is publicly readable.",
         "classification": "public",
-        "content": "Public cyber range information.",
+        "owner": None,
     },
     "record-002": {
         "id": "record-002",
-        "owner": None,
+        "title": "Public maintenance notice",
+        "content": "Scheduled maintenance information.",
         "classification": "public",
-        "content": "Public operational information.",
+        "owner": None,
     },
     "record-101": {
         "id": "record-101",
+        "title": "Analyst investigation notes",
+        "content": "Internal notes belonging to the analyst.",
+        "classification": "analyst",
         "owner": "analyst",
-        "classification": "analyst-owned",
-        "content": "Analyst-owned investigation record.",
     },
     "record-102": {
         "id": "record-102",
+        "title": "Analyst working data",
+        "content": "Data owned by the analyst.",
+        "classification": "analyst",
         "owner": "analyst",
-        "classification": "analyst-owned",
-        "content": "Analyst-owned analysis record.",
     },
     "record-201": {
         "id": "record-201",
-        "owner": "security",
+        "title": "Restricted incident report",
+        "content": "Restricted security investigation data.",
         "classification": "restricted",
-        "content": "Restricted security record.",
+        "owner": "security",
     },
     "record-202": {
         "id": "record-202",
-        "owner": "security",
+        "title": "Restricted credentials inventory",
+        "content": "Restricted inventory data.",
         "classification": "restricted",
-        "content": "Restricted operational record.",
+        "owner": "security",
     },
 }
 
 
+def load_records() -> dict[str, dict]:
+    if not STATE_FILE.exists():
+        save_records(INITIAL_RECORDS)
+        return dict(INITIAL_RECORDS)
+
+    with STATE_FILE.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def save_records(records: dict[str, dict]) -> None:
+    with STATE_FILE.open("w", encoding="utf-8") as file:
+        json.dump(records, file, indent=2)
+
+
+RECORDS = load_records()
+
+
 class TargetHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
 
-        if path == "/":
-            body = {
-                "service": "Cyber Range Stateful Target",
-                "environment": "lab03",
-            }
-            self._send_json(200, body)
+        if parsed.path == "/":
+            self._send_text(
+                200,
+                "Cyber Range Stateful Target\n"
+                "Service: HTTP\n"
+                "Environment: lab03\n",
+            )
             return
 
-        if path == "/health":
-            self._send_json(200, {"status": "ok"})
+        if parsed.path == "/health":
+            self._send_text(200, "OK\n")
             return
 
-        if path == "/records":
-            self._handle_list_records()
+        if parsed.path == "/records":
+            self._list_records()
             return
 
-        record_id = self._record_id_from_path(path)
-
-        if record_id is not None:
-            self._handle_get_record(record_id)
+        if parsed.path.startswith("/records/"):
+            record_id = parsed.path.removeprefix("/records/")
+            self._get_record(record_id)
             return
 
-        self._send_json(404, {"error": "Not Found"})
+        self._send_json(404, {"error": "not_found"})
 
     def do_POST(self) -> None:
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
 
-        if path != "/records":
-            self._send_json(404, {"error": "Not Found"})
+        if parsed.path == "/records":
+            self._create_record()
             return
 
-        user = self._authenticated_user()
-
-        if user != AGENT_USER:
-            self._send_json(403, {"error": "Forbidden"})
-            return
-
-        payload = self._read_json()
-
-        if payload is None:
-            return
-
-        content = payload.get("content")
-
-        if not isinstance(content, str) or not content:
-            self._send_json(
-                400,
-                {"error": "Field 'content' is required"},
-            )
-            return
-
-        record_id = self._next_record_id()
-
-        RECORDS[record_id] = {
-            "id": record_id,
-            "owner": user,
-            "classification": "analyst-owned",
-            "content": content,
-        }
-
-        self._send_json(201, RECORDS[record_id])
+        self._send_json(404, {"error": "not_found"})
 
     def do_PUT(self) -> None:
-        path = urlparse(self.path).path
-        record_id = self._record_id_from_path(path)
+        parsed = urlparse(self.path)
 
-        if record_id is None:
-            self._send_json(404, {"error": "Not Found"})
+        if parsed.path.startswith("/records/"):
+            record_id = parsed.path.removeprefix("/records/")
+            self._update_record(record_id)
             return
 
-        user = self._authenticated_user()
-
-        if not self._can_modify(user, record_id):
-            self._send_json(403, {"error": "Forbidden"})
-            return
-
-        payload = self._read_json()
-
-        if payload is None:
-            return
-
-        content = payload.get("content")
-
-        if not isinstance(content, str) or not content:
-            self._send_json(
-                400,
-                {"error": "Field 'content' is required"},
-            )
-            return
-
-        RECORDS[record_id]["content"] = content
-
-        self._send_json(200, RECORDS[record_id])
+        self._send_json(404, {"error": "not_found"})
 
     def do_DELETE(self) -> None:
-        path = urlparse(self.path).path
-        record_id = self._record_id_from_path(path)
+        parsed = urlparse(self.path)
 
-        if record_id is None:
-            self._send_json(404, {"error": "Not Found"})
+        if parsed.path.startswith("/records/"):
+            record_id = parsed.path.removeprefix("/records/")
+            self._delete_record(record_id)
             return
 
-        user = self._authenticated_user()
+        self._send_json(404, {"error": "not_found"})
 
-        if not self._can_modify(user, record_id):
-            self._send_json(403, {"error": "Forbidden"})
-            return
+    def _current_user(self) -> str | None:
+        return self.headers.get("X-Agent-User")
 
-        deleted = RECORDS.pop(record_id)
+    def _can_read(self, record: dict, user: str | None) -> bool:
+        classification = record["classification"]
 
-        self._send_json(
-            200,
-            {
-                "deleted": True,
-                "record": deleted,
-            },
+        if classification == "public":
+            return True
+
+        if classification == "analyst":
+            return user == record["owner"]
+
+        if classification == "restricted":
+            return False
+
+        return False
+
+    def _can_modify(self, record: dict, user: str | None) -> bool:
+        return (
+            record["classification"] == "analyst"
+            and user == record["owner"]
         )
 
-    def _handle_list_records(self) -> None:
-        user = self._authenticated_user()
+    def _list_records(self) -> None:
+        user = self._current_user()
 
-        visible_records = [
+        visible = [
             record
             for record in RECORDS.values()
-            if self._can_read(user, record)
+            if self._can_read(record, user)
         ]
 
-        self._send_json(
-            200,
-            {
-                "records": visible_records,
-            },
-        )
+        self._send_json(200, {"records": visible})
 
-    def _handle_get_record(self, record_id: str) -> None:
+    def _get_record(self, record_id: str) -> None:
+        user = self._current_user()
         record = RECORDS.get(record_id)
 
         if record is None:
-            self._send_json(404, {"error": "Not Found"})
+            self._send_json(404, {"error": "record_not_found"})
             return
 
-        user = self._authenticated_user()
-
-        if not self._can_read(user, record):
-            self._send_json(403, {"error": "Forbidden"})
+        if not self._can_read(record, user):
+            self._send_json(403, {"error": "forbidden"})
             return
 
         self._send_json(200, record)
 
-    def _authenticated_user(self) -> str | None:
-        return self.headers.get("X-Agent-User")
+    def _create_record(self) -> None:
+        user = self._current_user()
 
-    @staticmethod
-    def _can_read(user: str | None, record: dict) -> bool:
-        if record["classification"] == "public":
-            return True
+        if not user:
+            self._send_json(401, {"error": "missing_identity"})
+            return
 
-        if record["classification"] == "analyst-owned":
-            return user == record["owner"]
+        payload = self._read_json()
 
-        return False
+        title = payload.get("title")
+        content = payload.get("content")
 
-    @staticmethod
-    def _can_modify(user: str | None, record_id: str) -> bool:
+        if not isinstance(title, str) or not isinstance(content, str):
+            self._send_json(
+                400,
+                {"error": "title_and_content_are_required"},
+            )
+            return
+
+        next_number = 1000 + len(RECORDS)
+        record_id = f"record-{next_number}"
+
+        record = {
+            "id": record_id,
+            "title": title,
+            "content": content,
+            "classification": "analyst",
+            "owner": user,
+        }
+
+        RECORDS[record_id] = record
+        save_records(RECORDS)
+
+        self._send_json(201, record)
+
+    def _update_record(self, record_id: str) -> None:
+        user = self._current_user()
         record = RECORDS.get(record_id)
 
         if record is None:
-            return False
+            self._send_json(404, {"error": "record_not_found"})
+            return
 
-        return (
-            record["classification"] == "analyst-owned"
-            and record["owner"] == user
-        )
+        if not self._can_modify(record, user):
+            self._send_json(403, {"error": "forbidden"})
+            return
 
-    def _read_json(self) -> dict | None:
-        try:
-            content_length = int(
-                self.headers.get("Content-Length", "0")
-            )
-            raw_body = self.rfile.read(content_length)
-            payload = json.loads(raw_body.decode("utf-8"))
-        except (ValueError, json.JSONDecodeError):
-            self._send_json(400, {"error": "Invalid JSON"})
-            return None
+        payload = self._read_json()
 
-        if not isinstance(payload, dict):
-            self._send_json(400, {"error": "JSON object required"})
-            return None
+        if "title" in payload:
+            record["title"] = payload["title"]
 
-        return payload
+        if "content" in payload:
+            record["content"] = payload["content"]
 
-    @staticmethod
-    def _record_id_from_path(path: str) -> str | None:
-        prefix = "/records/"
+        save_records(RECORDS)
+        self._send_json(200, record)
 
-        if not path.startswith(prefix):
-            return None
+    def _delete_record(self, record_id: str) -> None:
+        user = self._current_user()
+        record = RECORDS.get(record_id)
 
-        record_id = path[len(prefix):]
+        if record is None:
+            self._send_json(404, {"error": "record_not_found"})
+            return
 
-        if not record_id or "/" in record_id:
-            return None
+        if not self._can_modify(record, user):
+            self._send_json(403, {"error": "forbidden"})
+            return
 
-        return record_id
+        del RECORDS[record_id]
+        save_records(RECORDS)
 
-    @staticmethod
-    def _next_record_id() -> str:
-        existing_ids = [
-            int(record_id.split("-")[1])
-            for record_id in RECORDS
-            if record_id.startswith("record-")
-            and record_id.split("-")[1].isdigit()
-        ]
+        self._send_json(200, {"deleted": record_id})
 
-        next_id = max(existing_ids, default=0) + 1
+    def _read_json(self) -> dict:
+        length = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(length)
 
-        return f"record-{next_id}"
+        if not body:
+            return {}
+
+        return json.loads(body.decode("utf-8"))
 
     def _send_json(self, status: int, body: dict) -> None:
         encoded_body = json.dumps(body).encode("utf-8")
 
         self.send_response(status)
-        self.send_header(
-            "Content-Type",
-            "application/json; charset=utf-8",
-        )
-        self.send_header(
-            "Content-Length",
-            str(len(encoded_body)),
-        )
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(encoded_body)))
+        self.end_headers()
+        self.wfile.write(encoded_body)
+
+    def _send_text(self, status: int, body: str) -> None:
+        encoded_body = body.encode("utf-8")
+
+        self.send_response(status)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded_body)))
         self.end_headers()
         self.wfile.write(encoded_body)
 
@@ -292,7 +286,7 @@ class TargetHandler(BaseHTTPRequestHandler):
 def main() -> None:
     server = HTTPServer((HOST, PORT), TargetHandler)
 
-    print(f"Lab 03 target listening on {HOST}:{PORT}")
+    print(f"Target HTTP server listening on {HOST}:{PORT}")
 
     try:
         server.serve_forever()
