@@ -99,7 +99,7 @@ Labs should read the configured model from their environment rather than hardcod
 Ollama stores its models in the Docker volume:
 
 ```text
-ai-agents-ollama-data
+ai-llm-ollama-data
 ```
 
 The volume allows downloaded models to survive container recreation.

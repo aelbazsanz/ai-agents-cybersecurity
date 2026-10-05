@@ -63,7 +63,7 @@ The agent is configured with:
 
 The agent is attached to:
 
-    ai-agents-llm
+    ai-llm-network
     lab02-audit_target-network
 
 The configured target is:

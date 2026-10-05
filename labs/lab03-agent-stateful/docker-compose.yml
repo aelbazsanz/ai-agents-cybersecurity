@@ -22,7 +22,7 @@ services:
 networks:
   llm-network:
     external: true
-    name: ai-agents-llm
+    name: ai-llm-network
 
   target-network:
     internal: true

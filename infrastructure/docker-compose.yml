@@ -1,7 +1,7 @@
 services:
   ollama:
     image: ollama/ollama:latest
-    container_name: ai-agents-ollama
+    container_name: ai-llm-ollama
 
     ports:
       - "${OLLAMA_HOST_PORT:-11434}:11434"
@@ -23,8 +23,8 @@ services:
 
 volumes:
   ollama_data:
-    name: ai-agents-ollama-data
+    name: ai-llm-ollama-data
 
 networks:
   llm-network:
-    name: ai-agents-llm
+    name: ai-llm-network

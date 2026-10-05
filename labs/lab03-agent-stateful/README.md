@@ -106,7 +106,7 @@ Stateful agent
 The network topology remains based on Lab 02:
 
 ```text
-ai-agents-llm
+ai-llm-network
       │
     Agent
       │

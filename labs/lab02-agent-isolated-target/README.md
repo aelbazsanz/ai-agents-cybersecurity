@@ -24,7 +24,7 @@ Lab 02 uses two separate Docker networks.
                  ┌─────────┴─────────┐
                  │                   │
            LLM Network          Target Network
-         ai-agents-llm            internal
+         ai-llm-network        internal
                  │                   │
               Ollama                Agent
                  ▲                ╱      │
@@ -36,10 +36,10 @@ Lab 02 uses two separate Docker networks.
 
 ### LLM network
 
-The shared `ai-agents-llm` network provides access to the Ollama service.
+The shared `ai-llm-network` network provides access to the Ollama service.
 
 ```text
-ai-agents-llm
+ai-llm-network
 
     ┌──────────┐
     │  Ollama  │
@@ -92,7 +92,7 @@ The Agent has two network interfaces:
 
 ```text
 Agent
- ├── ai-agents-llm
+ ├── ai-llm-network
  └── target-network
 ```
 
@@ -131,7 +131,7 @@ The Target:
 
 The Agent:
 
-* has access to Ollama through `ai-agents-llm`;
+* has access to Ollama through `ai-llm-network`;
 * has access to the Target through `target-network`;
 * does not have access to the Docker socket;
 * does not run privileged;

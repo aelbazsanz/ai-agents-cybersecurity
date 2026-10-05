@@ -49,7 +49,7 @@ The agent is attached to two Docker networks:
 
 | Network                      | Subnet          | Purpose            |
 | ---------------------------- | --------------- | ------------------ |
-| `ai-agents-llm`              | `172.23.0.0/16` | LLM infrastructure |
+| `ai-llm-network`             | `172.23.0.0/16` | LLM infrastructure |
 | `lab02-audit_target-network` | `172.18.0.0/16` | Lab target         |
 
 The configured target is:

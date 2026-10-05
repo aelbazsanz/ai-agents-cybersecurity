@@ -47,7 +47,7 @@ The relevant configuration is:
 * LLM service: `ollama`
 * LLM model: `qwen3:8b`
 * Target network: `target-network`
-* LLM network: `ai-agents-llm`
+* LLM network: `ai-llm-network`
 
 The agent is connected to both Docker networks.
 
