@@ -57,7 +57,13 @@ See [`infrastructure/INFRASTRUCTURE.md`](infrastructure/INFRASTRUCTURE.md) for d
 
 ## Labs
 
-Labs will be added progressively under `labs/`.
+Labs are added progressively under `labs/`.
+
+### Current labs
+
+| Lab | Description |
+|-----|-------------|
+| [`lab01-basic-agent`](labs/lab01-basic-agent) | Basic agent with LLM tool calling — understand agent architecture and workflow |
 
 Each lab should document:
 
@@ -105,9 +111,8 @@ The project will evolve through several stages:
 
 ### 1. Agent fundamentals
 
+* ✅ **lab01-basic-agent** — basic agent with LLM tool calling, agent loop, and session logging
 * LLM client
-* basic agent
-* tool calling
 * agent loop
 * planning
 * memory

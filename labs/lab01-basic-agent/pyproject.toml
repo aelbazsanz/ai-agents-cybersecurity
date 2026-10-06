@@ -1,0 +1,9 @@
+[project]
+name = "lab01-basic-agent"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = []
+
+# To run the interactive agent:
+#   uv run python3 -m app
+#   OR: python3 app.py
