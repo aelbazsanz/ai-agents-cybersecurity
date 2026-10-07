@@ -43,14 +43,16 @@ from tools import TOOLS, TOOL_HANDLERS, parse_arguments
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
+# Determine the project root by going up from the src/ directory.
+# __file__ points to src/app.py, so dirname() gives src/, dirname() again gives the project root.
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:8b")
 DEBUG = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
 
-# Log directory for session logs
-LOG_DIR = os.path.join(APP_DIR, "logs")
+# Log directory for session logs (at project root level: labs/lab01-basic-agent/logs/)
+LOG_DIR = os.path.join(PROJECT_ROOT, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # Session tracking (one file per session)
@@ -241,14 +243,16 @@ def process_prompt(prompt: str, turn: int = 0) -> None:
     except urllib.error.URLError as e:
         print(f"[ERROR] Failed to connect to Ollama at {OLLAMA_URL}: {e}")
         print("[AGENT] Make sure Ollama is running and accessible.")
+        log_interaction(turn, prompt, f"[ERROR] Failed to connect to Ollama: {e}", error=f"URLError: {e}")
     except Exception as e:
         print(f"[ERROR] Unexpected error: {e}")
+        log_interaction(turn, prompt, f"[ERROR] Unexpected error: {e}", error=f"Exception: {e}")
 
 
 # ---------------------------------------------------------------------------
 # Session logging
 # ---------------------------------------------------------------------------
-def log_interaction(turn: int, user_prompt: str, response: str) -> None:
+def log_interaction(turn: int, user_prompt: str, response: str, error: str = None) -> None:
     """Save interaction to JSON Lines file named {session_id}.json in logs/."""
     log_entry: dict = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -258,6 +262,8 @@ def log_interaction(turn: int, user_prompt: str, response: str) -> None:
         "response": response,
         "turn": turn,
     }
+    if error is not None:
+        log_entry["error"] = error
 
     log_path = os.path.join(LOG_DIR, f"{session_id}.json")
     with open(log_path, "a", encoding="utf-8") as f:

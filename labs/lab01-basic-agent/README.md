@@ -12,8 +12,9 @@ This lab demonstrates the basic agent architecture and workflow with real LLM in
 
 ```
 labs/lab01-basic-agent/
-├── app.py                     # Interactive agent (menu + agent loop + logging)
-├── tools.py                   # 3 built-in sample tools
+├── src/
+│   ├── app.py                 # Interactive agent (menu + agent loop + logging)
+│   └── tools.py               # 3 built-in sample tools
 ├── logs/                      # Session logs (auto-generated, not in git)
 │   └── {session_id}.json      # JSON Lines file per session
 ├── pyproject.toml             # uv project config
@@ -33,6 +34,7 @@ Each interactive session is logged to a JSON Lines file in the `logs/` folder.
   - `user_prompt`: The user's input prompt
   - `response`: Final LLM response (or tool execution result)
   - `turn`: Turn number within the session
+  - `error` *(optional)*: Error type and message when an error occurs (e.g. `Exception: timed out`, `URLError: Failed to connect...`)
 
 > **Note**: The `logs/` folder is in `.gitignore` — session logs are never committed to git.
 
@@ -61,10 +63,10 @@ Each interactive session is logged to a JSON Lines file in the `logs/` folder.
 cd labs/lab01-basic-agent
 
 # Main command — runs the interactive agent
-uv run python3 -m app
+uv run python3 -m src.app
 
-# Or run directly with python3
-python3 app.py
+# Or run directly with python3 (from the project root)
+python3 src/app.py
 ```
 
 Make sure the shared infrastructure (Ollama) is running first:

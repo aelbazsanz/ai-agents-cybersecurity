@@ -5,5 +5,5 @@ requires-python = ">=3.11"
 dependencies = []
 
 # To run the interactive agent:
-#   uv run python3 -m app
-#   OR: python3 app.py
+#   uv run python3 -m src.app
+#   OR: python3 src/app.py
