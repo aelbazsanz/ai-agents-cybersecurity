@@ -1,0 +1,13 @@
+[project]
+name = "lab02-agent-goal-hijack"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = []
+
+# To run the interactive agent:
+#   uv run python3 -m src.app
+#   OR: python3 src/app.py
+
+# Lab objective: demonstrate OWASP Top 10 Agentic AI — ASI:01 Agent Goal Hijack.
+# Tools added for this lab (run_command, read_file, send_data) are intentionally
+# vulnerable by design for educational purposes.
